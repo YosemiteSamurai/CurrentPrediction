@@ -1,13 +1,26 @@
-# TODO - go through torch_geometric docs
-#   and determine if any of this work is redundant with library functions
+# =============================================================================
+# graph.py -- Graph Data Structure
+#
+# Provides a Graph class that holds the circuit graph representation:
+#   A: COO-format sparse edge index (2xE tensor of source/dest node indices)
+#   y: Edge weight labels (simulated branch current values)
+#   X: Node feature matrix
+#
+# Key methods:
+#   add_edge: Appends a directed edge with its current label.
+#   merge(graph): Combines two graphs into one by offsetting the second
+#     graph's node indices by self.num_nodes, enabling batch training.
+#
+# batch_graph(batch, config): Converts a raw DataLoader batch into a single
+#   merged Graph object -- one graph per sample, all concatenated for
+#   parallel GPU processing.
+# =============================================================================
 
 import torch
 
 class Graph():
+
     def __init__(self, edges, features, config):
-        # Implement as a mask?
-        # self.target_edges = models[config.model]['target']
-        # self.target_labels = models[config.model]['target']
 
         self.A = [[], []]
         self.A_blank = [[], []]
@@ -20,42 +33,25 @@ class Graph():
         self.y = torch.tensor(self.y)
         self.X = features
 
-        # print(f"A: {self.A.shape}\n{self.A}")
-        # print(f"y: {self.y.shape}\n{self.y}")
-        # print(f"X: {self.X.shape}\n{self.X}")
-
         self.num_nodes = self.X.shape[0]
 
-        # if config.log_current:
-        #     self.y = torch.log(self.y)
-        #     self.y = torch.abs(self.y)
-
     def add_edge(self, start, end, weight):
+
         self.A[0].append(int(start))
         self.A[1].append(int(end))
         self.y.append(weight)
 
     def merge(self, graph):
-        # print(self.A.shape)
-        # print(f"X: {self.X.shape}")
+
         self.A = torch.cat((self.A, graph.A + self.num_nodes), dim=1)
-
-        # print(f"A[0]: {self.A[0].shape}\n{self.A[0]}")
-        # print(f"A[1]: {self.A[1].shape}\n{self.A[1]}")
-
         self.y = torch.cat((self.y, graph.y), dim=0)
-
         self.X = torch.cat((self.X, graph.X), dim=0)
-        # print(self.A.shape)
-        # print(f"X: {self.X.shape}")
-
         self.num_nodes += graph.num_nodes
 
 def batch_graph(batch, config):
+
     graphs = []
-    # print(len(batch))
-    # print(f"batch[0]: {batch[0].shape}\n{batch[0]}")
-    # print(f"batch[1]: {batch[1].shape)\n{batch[1]}")
+
     for i in range(len(batch[0])):
         edges = batch[0][i]
         features = batch[1][i]
