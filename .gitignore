@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Weights & Biases
+wandb/
+
+# Saved models / checkpoints
+*.pt
+*.pth
+*.ckpt
+
+# Data files (fetched at runtime from OSU server)
+*.json
+*.csv
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Google Drive
+.tmp.driveupload/
