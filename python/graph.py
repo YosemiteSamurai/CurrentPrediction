@@ -2,18 +2,17 @@
 # graph.py -- Graph Data Structure
 #
 # Provides a Graph class that holds the circuit graph representation:
-#   A: COO-format sparse edge index (2xE tensor of source/dest node indices)
-#   y: Edge weight labels (simulated branch current values)
-#   X: Node feature matrix
+#   - A: COO-format sparse edge index (2xE tensor of source/dest node indices)
+#   - y: Edge weight labels (simulated branch current values)
+#   - X: Node feature matrix
 #
 # Key methods:
-#   add_edge: Appends a directed edge with its current label.
-#   merge(graph): Combines two graphs into one by offsetting the second
+#   - add_edge: Appends a directed edge with its current label.
+#   - merge(graph): Combines two graphs into one by offsetting the second
 #     graph's node indices by self.num_nodes, enabling batch training.
-#
-# batch_graph(batch, config): Converts a raw DataLoader batch into a single
-#   merged Graph object -- one graph per sample, all concatenated for
-#   parallel GPU processing.
+#   - batch_graph(batch, config): Converts a raw DataLoader batch into a single
+#     merged Graph object -- one graph per sample, all concatenated for
+#     parallel GPU processing.
 # =============================================================================
 
 import torch

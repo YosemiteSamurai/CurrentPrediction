@@ -8,17 +8,10 @@ __pycache__/
 .ipynb_checkpoints/
 *.ipynb_checkpoints
 
-# Weights & Biases
-wandb/
-
 # Saved models / checkpoints
 *.pt
 *.pth
 *.ckpt
-
-# Data files (fetched at runtime from OSU server)
-*.json
-*.csv
 
 # Virtual environments
 .venv/

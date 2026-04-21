@@ -1,0 +1,26 @@
+name: currentprediction
+channels:
+  - defaults
+  - conda-forge
+  - pytorch
+  - pyg
+  - nvidia
+  - anaconda
+  - nodefaults
+dependencies:
+  - python=3.10
+  - pip
+  - numpy
+  - pandas
+  - matplotlib
+  - scikit-learn
+  - pytorch
+  - torchvision
+  - torchaudio
+  - pyg
+  - cudatoolkit
+  - pip:
+      - wandb
+      - tqdm
+      - networkx
+      - jupyter

@@ -1,0 +1,34 @@
+wandb: [wandb.login()] Loaded credentials for https://api.wandb.ai from /nfs/stak/users/jonesm25/.netrc.
+wandb: Currently logged in as: jonesm25 (yosemitesamurai) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: Tracking run with wandb version 0.26.0
+wandb: Run data is saved locally in /nfs/stak/users/jonesm25/CurrentPrediction/wandb/run-20260416_122405-7m31pjm6
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run pleasant-sound-2
+wandb: ⭐️ View project at https://wandb.ai/yosemitesamurai/CurrentPrediction
+wandb: 🚀 View run at https://wandb.ai/yosemitesamurai/CurrentPrediction/runs/7m31pjm6
+wandb: updating run metadata
+wandb: uploading output.log; uploading wandb-summary.json; uploading config.yaml
+wandb: uploading history steps 99-99, summary, console lines 499-504
+wandb: 
+wandb: Run history:
+wandb:                  Avg Test Loss █▆▄▂▂▂▂▂▂▂▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:                          Epoch ▁▁▁▁▂▂▂▃▃▃▃▃▃▃▃▄▄▄▄▄▄▅▅▅▅▅▅▅▅▆▆▆▆▆▆▇▇███
+wandb:                             LR ████████▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▂▂▂▂▁▁▁▁▁▁▁▁
+wandb:  Max Relative Error (I_target) █▄▃▃▂▁▂▁▂▁▂▂▂▁▂▂▂▂▂▂▂▂▂▂▁▂▂▂▂▂▂▂▂▂▂▂▂▂▂▂
+wandb: Mean Relative Error (I_target) ▆▅▃▄▁▄▄▇██▅▆▅▆▅▃▅▇▅▇▇▅▇▅▆▆▆▇▆▇▇▆▇▇▇▆▇▇▇▇
+wandb:  Min Relative Error (I_target) █▂▃▁▂▄▃▂▅▂▂▅▂▂▁▂▁▂▂▂▂▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▃▁▂▂
+wandb:                  Training Loss █▃▃▃▂▂▂▂▂▂▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb: 
+wandb: Run summary:
+wandb:                  Avg Test Loss 0.18669
+wandb:                          Epoch 100
+wandb:                             LR 1e-05
+wandb:  Max Relative Error (I_target) 784.04681
+wandb: Mean Relative Error (I_target) 7.70498
+wandb:  Min Relative Error (I_target) 0
+wandb:                  Training Loss 0.18395
+wandb: 
+wandb: 🚀 View run 64-width, 5-layer, 4-heads at: https://wandb.ai/yosemitesamurai/CurrentPrediction/runs/7m31pjm6
+wandb: ⭐️ View project at: https://wandb.ai/yosemitesamurai/CurrentPrediction
+wandb: Synced 5 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
+wandb: Find logs at: ./wandb/run-20260416_122405-7m31pjm6/logs

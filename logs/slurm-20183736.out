@@ -1,0 +1,594 @@
+Job ID: 20183736
+Node:   cn-gpu3
+Start:  Thu Apr 16 12:23:39 PM PDT 2026
+[sweep] base imports done
+[dataset] imports complete
+[dataset] loading JSON...
+[dataset] loaded 112500 rows
+[dataset] normalizing labels...
+===================Data loaded successfully===============
+head
+       Size  Option       WN1       WP1  ...  I_target     SkewL     SkewR  Design
+0  2.248776     0.0  0.530458  0.919172  ... -1.521418 -1.118034 -1.118034    2inv
+1  2.248776     0.0  1.964871 -0.737184  ... -0.630729 -1.118034 -1.118034    2inv
+2  2.248776     0.0  1.190372  1.650021  ... -1.144842 -1.118034 -1.118034    2inv
+3  2.248776     0.0  2.506291  1.851304  ... -1.084082 -1.118034 -1.118034    2inv
+4  2.248776     0.0  1.147926  1.252151  ... -0.464454 -1.118034 -1.118034    2inv
+
+[5 rows x 56 columns]
+infomation
+<class 'pandas.DataFrame'>
+RangeIndex: 112500 entries, 0 to 112499
+Data columns (total 56 columns):
+ #   Column    Non-Null Count   Dtype  
+---  ------    --------------   -----  
+ 0   Size      112500 non-null  float64
+ 1   Option    112500 non-null  float64
+ 2   WN1       112500 non-null  float64
+ 3   WP1       112500 non-null  float64
+ 4   WN2       112500 non-null  float64
+ 5   WP2       112500 non-null  float64
+ 6   L1        112500 non-null  float64
+ 7   L2        112500 non-null  float64
+ 8   VDD       112500 non-null  float64
+ 9   Temp      112500 non-null  float64
+ 10  VTH0_N    112500 non-null  float64
+ 11  TOX_N     112500 non-null  float64
+ 12  TOXP_N    112500 non-null  float64
+ 13  TOXM_N    112500 non-null  float64
+ 14  U0_N      112500 non-null  float64
+ 15  UC_N      112500 non-null  float64
+ 16  VSAT_N    112500 non-null  float64
+ 17  XJ_N      112500 non-null  float64
+ 18  NDEP_N    112500 non-null  float64
+ 19  NF_N      112500 non-null  float64
+ 20  ETA0_N    112500 non-null  float64
+ 21  K2_N      112500 non-null  float64
+ 22  DVT2_N    112500 non-null  float64
+ 23  VOFF_N    112500 non-null  float64
+ 24  PCLM_N    112500 non-null  float64
+ 25  RDSW_N    112500 non-null  float64
+ 26  CGSO_N    112500 non-null  float64
+ 27  CGDO_N    112500 non-null  float64
+ 28  VTH0_P    112500 non-null  float64
+ 29  TOX_P     112500 non-null  float64
+ 30  TOXP_P    112500 non-null  float64
+ 31  TOXM_P    112500 non-null  float64
+ 32  U0_P      112500 non-null  float64
+ 33  UC_P      112500 non-null  float64
+ 34  VSAT_P    112500 non-null  float64
+ 35  XJ_P      112500 non-null  float64
+ 36  NDEP_P    112500 non-null  float64
+ 37  NF_P      112500 non-null  float64
+ 38  ETA0_P    112500 non-null  float64
+ 39  VOFF_P    112500 non-null  float64
+ 40  RDSW_P    112500 non-null  float64
+ 41  CGSO_P    112500 non-null  float64
+ 42  CGDO_P    112500 non-null  float64
+ 43  V_vdd     112500 non-null  float64
+ 44  V_gnd     112500 non-null  float64
+ 45  V_in      112500 non-null  float64
+ 46  V_out     112500 non-null  float64
+ 47  V_target  112500 non-null  float64
+ 48  I_vdd     112500 non-null  float64
+ 49  I_gnd     112500 non-null  float64
+ 50  I_in      112500 non-null  float64
+ 51  I_out     112500 non-null  float64
+ 52  I_target  112500 non-null  float64
+ 53  SkewL     112500 non-null  float64
+ 54  SkewR     112500 non-null  float64
+ 55  Design    112500 non-null  str    
+dtypes: float64(55), str(1)
+memory usage: 48.1 MB
+None
+size of DF
+(112500, 56)
+[dataset] device: cuda:0
+[sweep] dataset imported
+[sweep] GCN imported
+Starting run: 64-width, 5-layer, 4-heads
+Device: cuda:0
+[sweep] datasets created: 78750 train, 33750 test
+[sweep] model initialized, starting training...
+Finished Epoch 1
+Training Loss: 0.3488882664123331
+Avg Test Loss 0.2947106011247183
+Mean Relative Error (I_target): 10.021866798400879
+LR: 0.0001
+Finished Epoch 2
+Training Loss: 0.2913385513096697
+Avg Test Loss 0.2828882621221633
+Mean Relative Error (I_target): 7.55819034576416
+LR: 0.0001
+Finished Epoch 3
+Training Loss: 0.2767480246144453
+Avg Test Loss 0.27002411617486966
+Mean Relative Error (I_target): 7.268486976623535
+LR: 0.0001
+Finished Epoch 4
+Training Loss: 0.26704435186117753
+Avg Test Loss 0.2584363333986834
+Mean Relative Error (I_target): 7.160348892211914
+LR: 0.0001
+Finished Epoch 5
+Training Loss: 0.24103652841492137
+Avg Test Loss 0.2286461291366844
+Mean Relative Error (I_target): 7.753978252410889
+LR: 0.0001
+Finished Epoch 6
+Training Loss: 0.21934415580464883
+Avg Test Loss 0.21444115879552625
+Mean Relative Error (I_target): 6.432197093963623
+LR: 0.0001
+Finished Epoch 7
+Training Loss: 0.2127454699611625
+Avg Test Loss 0.2151518118536868
+Mean Relative Error (I_target): 4.850456714630127
+LR: 0.0001
+Finished Epoch 8
+Training Loss: 0.20890319905342586
+Avg Test Loss 0.20703841995147731
+Mean Relative Error (I_target): 6.956954002380371
+LR: 0.0001
+Finished Epoch 9
+Training Loss: 0.20679122403609176
+Avg Test Loss 0.208099324182029
+Mean Relative Error (I_target): 6.182431697845459
+LR: 0.0001
+Finished Epoch 10
+Training Loss: 0.20352984499829613
+Avg Test Loss 0.20162611004159348
+Mean Relative Error (I_target): 6.446462631225586
+LR: 0.0001
+Finished Epoch 11
+Training Loss: 0.2019677069681488
+Avg Test Loss 0.2008475002589949
+Mean Relative Error (I_target): 6.846681118011475
+LR: 0.0001
+Finished Epoch 12
+Training Loss: 0.20063784686725153
+Avg Test Loss 0.2003339272822249
+Mean Relative Error (I_target): 6.677575588226318
+LR: 0.0001
+Finished Epoch 13
+Training Loss: 0.19956706445066244
+Avg Test Loss 0.20482162959626501
+Mean Relative Error (I_target): 7.598498344421387
+LR: 0.0001
+Finished Epoch 14
+Training Loss: 0.19879301263822477
+Avg Test Loss 0.2057316478606649
+Mean Relative Error (I_target): 5.835428714752197
+LR: 0.0001
+Finished Epoch 15
+Training Loss: 0.19802726932968953
+Avg Test Loss 0.20097544117702693
+Mean Relative Error (I_target): 6.185325622558594
+LR: 0.0001
+Finished Epoch 16
+Training Loss: 0.1976470337822664
+Avg Test Loss 0.20072451107451136
+Mean Relative Error (I_target): 7.043105602264404
+LR: 0.0001
+Finished Epoch 17
+Training Loss: 0.1969933128290935
+Avg Test Loss 0.1969724746676983
+Mean Relative Error (I_target): 7.4783430099487305
+LR: 0.0001
+Finished Epoch 18
+Training Loss: 0.19644255696976393
+Avg Test Loss 0.1950509436605101
+Mean Relative Error (I_target): 6.745084762573242
+LR: 0.0001
+Finished Epoch 19
+Training Loss: 0.19589646266715063
+Avg Test Loss 0.19621830358748188
+Mean Relative Error (I_target): 7.262806415557861
+LR: 0.0001
+Finished Epoch 20
+Training Loss: 0.19588346258623238
+Avg Test Loss 0.20099662826948256
+Mean Relative Error (I_target): 6.528068542480469
+LR: 0.0001
+Finished Epoch 21
+Training Loss: 0.19512398847049933
+Avg Test Loss 0.20022712004551954
+Mean Relative Error (I_target): 7.494795799255371
+LR: 0.0001
+Finished Epoch 22
+Training Loss: 0.19474021729258975
+Avg Test Loss 0.20487550098749133
+Mean Relative Error (I_target): 7.669284343719482
+LR: 0.0001
+Finished Epoch 23
+Training Loss: 0.1941716221336401
+Avg Test Loss 0.19615264242576763
+Mean Relative Error (I_target): 6.955694198608398
+LR: 0.0001
+Finished Epoch 24
+Training Loss: 0.19434207833452663
+Avg Test Loss 0.2003904394699499
+Mean Relative Error (I_target): 6.865238189697266
+LR: 0.0001
+Finished Epoch 25
+Training Loss: 0.1939643579877668
+Avg Test Loss 0.19893583966092476
+Mean Relative Error (I_target): 7.742119312286377
+LR: 0.0001
+Finished Epoch 26
+Training Loss: 0.19367419258183893
+Avg Test Loss 0.19774367836131868
+Mean Relative Error (I_target): 7.052303314208984
+LR: 0.0001
+Finished Epoch 27
+Training Loss: 0.1933786703689173
+Avg Test Loss 0.19808787952102191
+Mean Relative Error (I_target): 8.122660636901855
+LR: 5e-05
+Finished Epoch 28
+Training Loss: 0.1902564764764555
+Avg Test Loss 0.1952456695844212
+Mean Relative Error (I_target): 6.276418685913086
+LR: 5e-05
+Finished Epoch 29
+Training Loss: 0.18993026638015262
+Avg Test Loss 0.19335343906241007
+Mean Relative Error (I_target): 8.009839057922363
+LR: 5e-05
+Finished Epoch 30
+Training Loss: 0.18970769939717846
+Avg Test Loss 0.19205856754740266
+Mean Relative Error (I_target): 8.112114906311035
+LR: 5e-05
+Finished Epoch 31
+Training Loss: 0.18943415664678326
+Avg Test Loss 0.19107989214749133
+Mean Relative Error (I_target): 7.856710910797119
+LR: 5e-05
+Finished Epoch 32
+Training Loss: 0.18953533321679583
+Avg Test Loss 0.19045757631554988
+Mean Relative Error (I_target): 7.615440845489502
+LR: 5e-05
+Finished Epoch 33
+Training Loss: 0.18915006493538775
+Avg Test Loss 0.19058501584128745
+Mean Relative Error (I_target): 7.527485370635986
+LR: 5e-05
+Finished Epoch 34
+Training Loss: 0.1891331555763065
+Avg Test Loss 0.19132939772018323
+Mean Relative Error (I_target): 7.215991020202637
+LR: 5e-05
+Finished Epoch 35
+Training Loss: 0.18927711390082985
+Avg Test Loss 0.19085468122320717
+Mean Relative Error (I_target): 7.422591686248779
+LR: 5e-05
+Finished Epoch 36
+Training Loss: 0.18919059387773385
+Avg Test Loss 0.1909711109659683
+Mean Relative Error (I_target): 7.2002339363098145
+LR: 5e-05
+Finished Epoch 37
+Training Loss: 0.1888561048633875
+Avg Test Loss 0.18981894454543624
+Mean Relative Error (I_target): 7.29906702041626
+LR: 5e-05
+Finished Epoch 38
+Training Loss: 0.1887617168606708
+Avg Test Loss 0.1905378628186705
+Mean Relative Error (I_target): 7.437765598297119
+LR: 5e-05
+Finished Epoch 39
+Training Loss: 0.1888819771876717
+Avg Test Loss 0.1894166861877057
+Mean Relative Error (I_target): 7.24298620223999
+LR: 5e-05
+Finished Epoch 40
+Training Loss: 0.18874396235719534
+Avg Test Loss 0.1925579995481889
+Mean Relative Error (I_target): 7.509117603302002
+LR: 5e-05
+Finished Epoch 41
+Training Loss: 0.18855161178661817
+Avg Test Loss 0.19143603374184026
+Mean Relative Error (I_target): 7.5672454833984375
+LR: 5e-05
+Finished Epoch 42
+Training Loss: 0.18860817276477232
+Avg Test Loss 0.1904301327269224
+Mean Relative Error (I_target): 7.973494529724121
+LR: 5e-05
+Finished Epoch 43
+Training Loss: 0.18832177174576945
+Avg Test Loss 0.19028204714799946
+Mean Relative Error (I_target): 7.060153484344482
+LR: 5e-05
+Finished Epoch 44
+Training Loss: 0.188317730505139
+Avg Test Loss 0.18968910576325457
+Mean Relative Error (I_target): 7.155444622039795
+LR: 5e-05
+Finished Epoch 45
+Training Loss: 0.188531344997924
+Avg Test Loss 0.1924360472867839
+Mean Relative Error (I_target): 6.5599236488342285
+LR: 5e-05
+Finished Epoch 46
+Training Loss: 0.1882399676011157
+Avg Test Loss 0.19230204724587535
+Mean Relative Error (I_target): 6.996520519256592
+LR: 5e-05
+Finished Epoch 47
+Training Loss: 0.18807261301244677
+Avg Test Loss 0.18877990123643695
+Mean Relative Error (I_target): 7.781896114349365
+LR: 5e-05
+Finished Epoch 48
+Training Loss: 0.18823351006393316
+Avg Test Loss 0.19187262049783463
+Mean Relative Error (I_target): 6.999672889709473
+LR: 5e-05
+Finished Epoch 49
+Training Loss: 0.18806207716337842
+Avg Test Loss 0.19306090017206862
+Mean Relative Error (I_target): 8.351335525512695
+LR: 5e-05
+Finished Epoch 50
+Training Loss: 0.18794939122951793
+Avg Test Loss 0.19797676241652096
+Mean Relative Error (I_target): 7.0413055419921875
+LR: 5e-05
+Finished Epoch 51
+Training Loss: 0.18799461398011832
+Avg Test Loss 0.19020245359830948
+Mean Relative Error (I_target): 7.637649059295654
+LR: 5e-05
+Finished Epoch 52
+Training Loss: 0.1879217702636555
+Avg Test Loss 0.18906048695905514
+Mean Relative Error (I_target): 7.613078594207764
+LR: 5e-05
+Finished Epoch 53
+Training Loss: 0.1879098554562258
+Avg Test Loss 0.18853395927291347
+Mean Relative Error (I_target): 7.54044771194458
+LR: 5e-05
+Finished Epoch 54
+Training Loss: 0.18773950164103015
+Avg Test Loss 0.1902421364922659
+Mean Relative Error (I_target): 6.983547687530518
+LR: 5e-05
+Finished Epoch 55
+Training Loss: 0.18794177791383004
+Avg Test Loss 0.19119174325776891
+Mean Relative Error (I_target): 7.330016136169434
+LR: 5e-05
+Finished Epoch 56
+Training Loss: 0.18775242378451582
+Avg Test Loss 0.1887143740086194
+Mean Relative Error (I_target): 7.621421813964844
+LR: 5e-05
+Finished Epoch 57
+Training Loss: 0.18784847916419892
+Avg Test Loss 0.19215147764338136
+Mean Relative Error (I_target): 7.776942729949951
+LR: 5e-05
+Finished Epoch 58
+Training Loss: 0.18762126088759998
+Avg Test Loss 0.19008876369886488
+Mean Relative Error (I_target): 7.284997463226318
+LR: 5e-05
+Finished Epoch 59
+Training Loss: 0.1877427424982717
+Avg Test Loss 0.1901387963814758
+Mean Relative Error (I_target): 7.225747108459473
+LR: 5e-05
+Finished Epoch 60
+Training Loss: 0.1876027956014603
+Avg Test Loss 0.19393320612574075
+Mean Relative Error (I_target): 7.721940040588379
+LR: 5e-05
+Finished Epoch 61
+Training Loss: 0.1876917854405573
+Avg Test Loss 0.19030487208993513
+Mean Relative Error (I_target): 7.197241306304932
+LR: 5e-05
+Finished Epoch 62
+Training Loss: 0.1874555562664851
+Avg Test Loss 0.19118524840657744
+Mean Relative Error (I_target): 7.403311729431152
+LR: 2.5e-05
+Finished Epoch 63
+Training Loss: 0.18594359336000835
+Avg Test Loss 0.18772900042375681
+Mean Relative Error (I_target): 7.567074298858643
+LR: 2.5e-05
+Finished Epoch 64
+Training Loss: 0.18572316840381847
+Avg Test Loss 0.18851770216254826
+Mean Relative Error (I_target): 7.525822162628174
+LR: 2.5e-05
+Finished Epoch 65
+Training Loss: 0.18586139248026332
+Avg Test Loss 0.1879002450342992
+Mean Relative Error (I_target): 7.44111967086792
+LR: 2.5e-05
+Finished Epoch 66
+Training Loss: 0.185819160069079
+Avg Test Loss 0.18851516671231572
+Mean Relative Error (I_target): 7.090051651000977
+LR: 2.5e-05
+Finished Epoch 67
+Training Loss: 0.185766023065636
+Avg Test Loss 0.1874040343467658
+Mean Relative Error (I_target): 7.766855716705322
+LR: 2.5e-05
+Finished Epoch 68
+Training Loss: 0.18578965359922592
+Avg Test Loss 0.18919430469732149
+Mean Relative Error (I_target): 7.447972774505615
+LR: 2.5e-05
+Finished Epoch 69
+Training Loss: 0.18572505577121115
+Avg Test Loss 0.18852967809868085
+Mean Relative Error (I_target): 7.571145534515381
+LR: 2.5e-05
+Finished Epoch 70
+Training Loss: 0.18558283097669634
+Avg Test Loss 0.18834763316887815
+Mean Relative Error (I_target): 7.767246246337891
+LR: 2.5e-05
+Finished Epoch 71
+Training Loss: 0.18571173186402212
+Avg Test Loss 0.18761562135829746
+Mean Relative Error (I_target): 7.652353286743164
+LR: 2.5e-05
+Finished Epoch 72
+Training Loss: 0.1855892646786814
+Avg Test Loss 0.18800144157774076
+Mean Relative Error (I_target): 7.54425048828125
+LR: 2.5e-05
+Finished Epoch 73
+Training Loss: 0.18551328961428273
+Avg Test Loss 0.18808100148682347
+Mean Relative Error (I_target): 7.92359733581543
+LR: 2.5e-05
+Finished Epoch 74
+Training Loss: 0.18542485487220103
+Avg Test Loss 0.18845778626712012
+Mean Relative Error (I_target): 7.27713680267334
+LR: 2.5e-05
+Finished Epoch 75
+Training Loss: 0.18550941782819214
+Avg Test Loss 0.1876899247415258
+Mean Relative Error (I_target): 7.5876922607421875
+LR: 2.5e-05
+Finished Epoch 76
+Training Loss: 0.18548621545473476
+Avg Test Loss 0.18914585620235494
+Mean Relative Error (I_target): 8.095693588256836
+LR: 1.25e-05
+Finished Epoch 77
+Training Loss: 0.1846532505815444
+Avg Test Loss 0.1871339501786571
+Mean Relative Error (I_target): 7.807968616485596
+LR: 1.25e-05
+Finished Epoch 78
+Training Loss: 0.1846374595603629
+Avg Test Loss 0.18741860754117018
+Mean Relative Error (I_target): 7.85906457901001
+LR: 1.25e-05
+Finished Epoch 79
+Training Loss: 0.18459457083809963
+Avg Test Loss 0.18742338626588126
+Mean Relative Error (I_target): 7.744150161743164
+LR: 1.25e-05
+Finished Epoch 80
+Training Loss: 0.1846207092458981
+Avg Test Loss 0.1872019286368978
+Mean Relative Error (I_target): 7.786398887634277
+LR: 1.25e-05
+Finished Epoch 81
+Training Loss: 0.1845700038836914
+Avg Test Loss 0.18753194614044297
+Mean Relative Error (I_target): 7.455855846405029
+LR: 1.25e-05
+Finished Epoch 82
+Training Loss: 0.1845996685368484
+Avg Test Loss 0.18689693533131296
+Mean Relative Error (I_target): 7.598080635070801
+LR: 1.25e-05
+Finished Epoch 83
+Training Loss: 0.18459716617640248
+Avg Test Loss 0.18742288169561405
+Mean Relative Error (I_target): 7.51419734954834
+LR: 1.25e-05
+Finished Epoch 84
+Training Loss: 0.1845526502795793
+Avg Test Loss 0.18689238734154906
+Mean Relative Error (I_target): 7.753772258758545
+LR: 1.25e-05
+Finished Epoch 85
+Training Loss: 0.18457651118551482
+Avg Test Loss 0.1872326432493343
+Mean Relative Error (I_target): 7.741973400115967
+LR: 1.25e-05
+Finished Epoch 86
+Training Loss: 0.18446327099551615
+Avg Test Loss 0.18693908889429264
+Mean Relative Error (I_target): 7.718731880187988
+LR: 1.25e-05
+Finished Epoch 87
+Training Loss: 0.1845297142333468
+Avg Test Loss 0.18771855940256638
+Mean Relative Error (I_target): 7.406497001647949
+LR: 1.25e-05
+Finished Epoch 88
+Training Loss: 0.18446721074961153
+Avg Test Loss 0.18739791565102423
+Mean Relative Error (I_target): 7.9868574142456055
+LR: 1.25e-05
+Finished Epoch 89
+Training Loss: 0.18444982999674628
+Avg Test Loss 0.1867815291606137
+Mean Relative Error (I_target): 7.79703426361084
+LR: 1.25e-05
+Finished Epoch 90
+Training Loss: 0.1844647653939786
+Avg Test Loss 0.18755247642714265
+Mean Relative Error (I_target): 7.281359672546387
+LR: 1.25e-05
+Finished Epoch 91
+Training Loss: 0.18443313843923728
+Avg Test Loss 0.18683909151650152
+Mean Relative Error (I_target): 7.582085609436035
+LR: 1.25e-05
+Finished Epoch 92
+Training Loss: 0.18442526434717357
+Avg Test Loss 0.1879598481112747
+Mean Relative Error (I_target): 7.706961154937744
+LR: 1.25e-05
+Finished Epoch 93
+Training Loss: 0.1843771723555821
+Avg Test Loss 0.1868303361732813
+Mean Relative Error (I_target): 7.6060590744018555
+LR: 1.25e-05
+Finished Epoch 94
+Training Loss: 0.184455181387613
+Avg Test Loss 0.18690111577087104
+Mean Relative Error (I_target): 7.855268478393555
+LR: 1.25e-05
+Finished Epoch 95
+Training Loss: 0.1843515217155884
+Avg Test Loss 0.18753820066980276
+Mean Relative Error (I_target): 7.780982494354248
+LR: 1.25e-05
+Finished Epoch 96
+Training Loss: 0.18439641921247035
+Avg Test Loss 0.1868140714852166
+Mean Relative Error (I_target): 7.701411247253418
+LR: 1.25e-05
+Finished Epoch 97
+Training Loss: 0.18435929129517015
+Avg Test Loss 0.18746334426634684
+Mean Relative Error (I_target): 7.448042392730713
+LR: 1.25e-05
+Finished Epoch 98
+Training Loss: 0.18433479249646925
+Avg Test Loss 0.1869155667404428
+Mean Relative Error (I_target): 7.67642068862915
+LR: 6.25e-06
+Finished Epoch 99
+Training Loss: 0.1839547449475391
+Avg Test Loss 0.18676801772337953
+Mean Relative Error (I_target): 7.5961503982543945
+LR: 6.25e-06
+Finished Epoch 100
+Training Loss: 0.18394732843798406
+Avg Test Loss 0.18669453218791157
+Mean Relative Error (I_target): 7.704980850219727
+LR: 6.25e-06
+Model saved to /nfs/stak/users/jonesm25/CurrentPrediction/python/../results/model.pt
+Finished: Thu Apr 16 03:01:19 PM PDT 2026
