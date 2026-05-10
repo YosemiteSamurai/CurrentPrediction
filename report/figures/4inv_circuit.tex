@@ -1,0 +1,230 @@
+% Cascaded Inverter Schematic (4inv.sp)
+% Shows all transistors, subcircuit boundaries, measurement sources, and wiring
+\documentclass[border=20pt]{standalone}
+\usepackage{circuitikz}
+\usetikzlibrary{calc,backgrounds}
+\newsavebox{\circuitbox}
+
+\begin{document}
+\savebox{\circuitbox}{%
+\begin{circuitikz}[american, scale=0.72, transform shape, thick]
+
+% ===== Title =====
+\node[font=\large\bfseries, anchor=south] at (18,15.5) {Cascaded Inverter Testbench (4inv.sp)};
+
+% ===== vdd and GND Buses =====
+\draw[ultra thick, red!60!black] (-1,14.5) -- (35.5,14.5);
+\node[above, font=\bfseries\small, red!60!black] at (-0.2,14.5) {VDD};
+\draw[ultra thick, blue!50!black] (-1,0) -- (35.5,0);
+\node[below, font=\bfseries\small, blue!50!black] at (-0.2,0) {GND};
+
+% ===============================================================
+% VDD SUPPLY CHAIN (x=1)
+% ===============================================================
+\draw (1,0) to[V, l_=$V_{DD}$] (1,3.5)
+            to[R, l_=$R_{supply}$] (1,7)
+            to[american voltage source, l_={$V_{m,vdd}$}] (1,10.5)
+            -- (1,14.5);
+\filldraw (1,3.5) circle(1.5pt); \node[left, font=\tiny] at (0.85,3.5) {vdd\_src};
+\filldraw (1,7) circle(1.5pt); \node[left, font=\tiny] at (0.85,7) {vdd\_meas};
+\filldraw (1,10.5) circle(1.5pt); \node[left, font=\scriptsize\bfseries] at (0.85,10.5) {vdd};
+
+% ===============================================================
+% INPUT CHAIN (x=5)
+% ===============================================================
+\draw (5,0) to[V, l=$V_{in}$] (5,3.5)
+            to[R, l=$R_{in}$] (5,7)
+            to[american voltage source, l={$V_{m,in}$}] (5,10.5);
+\filldraw (5,3.5) circle(1.5pt); \node[left, font=\tiny] at (4.85,3.5) {in\_src};
+\filldraw (5,7) circle(1.5pt); \node[left, font=\tiny] at (4.85,7) {in\_meas};
+\filldraw (5,10.5) circle(1.5pt); \node[above right, font=\scriptsize\bfseries] at (5.05,10.5) {in};
+
+% ===============================================================
+% INVERTER 1 (x=9) -> Vmeas_n12 -> n12
+% ===============================================================
+\draw (9,14.5) -- (9,13.5);
+\draw (9,13.5) node[pmos, anchor=S] (mp1) {};
+\node[right, font=\scriptsize\bfseries] at ($(mp1.center)+(0.55,0.15)$) {MP1};
+\node[right, font=\tiny, text=gray] at ($(mp1.center)+(0.55,-0.25)$) {W\!=\!WP1, L\!=\!L1};
+\filldraw (mp1.D) circle(1.5pt);
+\node[right, font=\tiny] at ($(mp1.D)+(0.15,0.15)$) {n12\_mp1};
+\draw (mp1.D) to[american voltage source, l_={$V_{p1}$}, a^={\tiny 0V}] (9,10);
+\draw (9,10) -- (9,7.5) coordinate (n12-int);
+\filldraw (n12-int) circle(2pt);
+\node[below left, font=\scriptsize\bfseries] at ($(n12-int)+(-0.1,-0.1)$) {n12\_int};
+
+\draw (9,0) -- (9,1);
+\draw (9,1) node[nmos, anchor=S] (mn1) {};
+\node[right, font=\scriptsize\bfseries] at ($(mn1.center)+(0.55,0.15)$) {MN1};
+\node[right, font=\tiny, text=gray] at ($(mn1.center)+(0.55,-0.25)$) {W\!=\!WN1, L\!=\!L1};
+\filldraw (mn1.D) circle(1.5pt);
+\node[right, font=\tiny] at ($(mn1.D)+(0.15,-0.15)$) {n12\_mn1};
+\draw (mn1.D) to[american voltage source, l={$V_{n1}$}, a={\tiny 0V}] (9,5.5);
+\draw (9,5.5) -- (n12-int);
+
+\draw (mp1.G) -- +(-2,0) coordinate (g1t);
+\draw (mn1.G) -- +(-2,0) coordinate (g1b);
+\draw (g1t) -- (g1b);
+\draw (5,10.5) -- (g1t);
+
+\draw (n12-int) -- (10.5,7.5);
+\draw (10.5,7.5) to[american voltage source, l_={$V_{m,n12}$}, a^={\tiny 0V}] (12.5,7.5)
+      coordinate (n12-node);
+\filldraw (n12-node) circle(2pt);
+\node[above, font=\scriptsize\bfseries] at (12.5,7.75) {n12};
+
+% ===============================================================
+% INVERTER 2 (x=15) -> Vmeas_target -> target
+% ===============================================================
+\draw (15,14.5) -- (15,13.5);
+\draw (15,13.5) node[pmos, anchor=S] (mp2) {};
+\node[right, font=\scriptsize\bfseries] at ($(mp2.center)+(0.55,0.15)$) {MP2};
+\node[right, font=\tiny, text=gray] at ($(mp2.center)+(0.55,-0.25)$) {W\!=\!WP1, L\!=\!L1};
+\filldraw (mp2.D) circle(1.5pt);
+\node[right, font=\tiny] at ($(mp2.D)+(0.15,0.15)$) {target\_mp2};
+\draw (mp2.D) to[american voltage source, l_={$V_{p2}$}, a^={\tiny 0V}] (15,10);
+\draw (15,10) -- (15,7.5) coordinate (target-int);
+\filldraw (target-int) circle(2pt);
+\node[below left, font=\scriptsize\bfseries] at ($(target-int)+(-0.1,-0.1)$) {target\_int};
+
+\draw (15,0) -- (15,1);
+\draw (15,1) node[nmos, anchor=S] (mn2) {};
+\node[right, font=\scriptsize\bfseries] at ($(mn2.center)+(0.55,0.15)$) {MN2};
+\node[right, font=\tiny, text=gray] at ($(mn2.center)+(0.55,-0.25)$) {W\!=\!WN1, L\!=\!L1};
+\filldraw (mn2.D) circle(1.5pt);
+\node[right, font=\tiny] at ($(mn2.D)+(0.15,-0.15)$) {target\_mn2};
+\draw (mn2.D) to[american voltage source, l={$V_{n2}$}, a={\tiny 0V}] (15,5.5);
+\draw (15,5.5) -- (target-int);
+
+\draw (mp2.G) -- +(-2,0) coordinate (g2t);
+\draw (mn2.G) -- +(-2,0) coordinate (g2b);
+\draw (g2t) -- (g2b);
+\draw (n12-node) -- (g2t);
+
+\draw (target-int) -- (16.5,7.5);
+\draw (16.5,7.5) to[american voltage source, l_={$V_{m,tgt}$}, a^={\tiny 0V}] (18.5,7.5)
+      coordinate (target-node);
+\filldraw (target-node) circle(2pt);
+\node[above, font=\scriptsize\bfseries] at (18.5,7.75) {target};
+
+% ===============================================================
+% INVERTER 3 (x=21) -> Vmeas_n34 -> n34
+% ===============================================================
+\draw (21,14.5) -- (21,13.5);
+\draw (21,13.5) node[pmos, anchor=S] (mp3) {};
+\node[right, font=\scriptsize\bfseries] at ($(mp3.center)+(0.55,0.15)$) {MP3};
+\node[right, font=\tiny, text=gray] at ($(mp3.center)+(0.55,-0.25)$) {W\!=\!WP2, L\!=\!L2};
+\filldraw (mp3.D) circle(1.5pt);
+\node[right, font=\tiny] at ($(mp3.D)+(0.15,0.15)$) {n34\_mp3};
+\draw (mp3.D) to[american voltage source, l_={$V_{p3}$}, a^={\tiny 0V}] (21,10);
+\draw (21,10) -- (21,7.5) coordinate (n34-int);
+\filldraw (n34-int) circle(2pt);
+\node[below left, font=\scriptsize\bfseries] at ($(n34-int)+(-0.1,-0.1)$) {n34\_int};
+
+\draw (21,0) -- (21,1);
+\draw (21,1) node[nmos, anchor=S] (mn3) {};
+\node[right, font=\scriptsize\bfseries] at ($(mn3.center)+(0.55,0.15)$) {MN3};
+\node[right, font=\tiny, text=gray] at ($(mn3.center)+(0.55,-0.25)$) {W\!=\!WN2, L\!=\!L2};
+\filldraw (mn3.D) circle(1.5pt);
+\node[right, font=\tiny] at ($(mn3.D)+(0.15,-0.15)$) {n34\_mn3};
+\draw (mn3.D) to[american voltage source, l={$V_{n3}$}, a={\tiny 0V}] (21,5.5);
+\draw (21,5.5) -- (n34-int);
+
+\draw (mp3.G) -- +(-2,0) coordinate (g3t);
+\draw (mn3.G) -- +(-2,0) coordinate (g3b);
+\draw (g3t) -- (g3b);
+\draw (target-node) -- (g3t);
+
+\draw (n34-int) -- (22.5,7.5);
+\draw (22.5,7.5) to[american voltage source, l_={$V_{m,n34}$}, a^={\tiny 0V}] (24.5,7.5)
+      coordinate (n34-node);
+\filldraw (n34-node) circle(2pt);
+\node[above, font=\scriptsize\bfseries] at (24.5,7.75) {n34};
+
+% ===============================================================
+% INVERTER 4 (x=27) -> Vmeas_out -> out
+% ===============================================================
+\draw (27,14.5) -- (27,13.5);
+\draw (27,13.5) node[pmos, anchor=S] (mp4) {};
+\node[right, font=\scriptsize\bfseries] at ($(mp4.center)+(0.55,0.15)$) {MP4};
+\node[right, font=\tiny, text=gray] at ($(mp4.center)+(0.55,-0.25)$) {W\!=\!WP2, L\!=\!L2};
+\filldraw (mp4.D) circle(1.5pt);
+\node[right, font=\tiny] at ($(mp4.D)+(0.15,0.15)$) {out\_mp4};
+\draw (mp4.D) to[american voltage source, l_={$V_{p4}$}, a^={\tiny 0V}] (27,10);
+\draw (27,10) -- (27,7.5) coordinate (out-meas);
+\filldraw (out-meas) circle(2pt);
+\node[below left, font=\scriptsize\bfseries] at ($(out-meas)+(-0.1,-0.1)$) {out\_meas};
+
+\draw (27,0) -- (27,1);
+\draw (27,1) node[nmos, anchor=S] (mn4) {};
+\node[right, font=\scriptsize\bfseries] at ($(mn4.center)+(0.55,0.15)$) {MN4};
+\node[right, font=\tiny, text=gray] at ($(mn4.center)+(0.55,-0.25)$) {W\!=\!WN2, L\!=\!L2};
+\filldraw (mn4.D) circle(1.5pt);
+\node[right, font=\tiny] at ($(mn4.D)+(0.15,-0.15)$) {out\_mn4};
+\draw (mn4.D) to[american voltage source, l={$V_{n4}$}, a={\tiny 0V}] (27,5.5);
+\draw (27,5.5) -- (out-meas);
+
+\draw (mp4.G) -- +(-2,0) coordinate (g4t);
+\draw (mn4.G) -- +(-2,0) coordinate (g4b);
+\draw (g4t) -- (g4b);
+\draw (n34-node) -- (g4t);
+
+\draw (out-meas) -- (28.5,7.5);
+\draw (28.5,7.5) to[american voltage source, l_={$V_{m,out}$}, a^={\tiny 0V}] (30.5,7.5)
+      coordinate (out-node);
+\filldraw (out-node) circle(2pt);
+\node[above right, font=\scriptsize\bfseries] at (30.5,7.55) {out};
+
+% ===============================================================
+% LOAD CAPACITOR (XCload: C_MEAS subcircuit)
+% ===============================================================
+\draw (out-node) -- (32,7.5) -- (32,6);
+\draw (32,6) to[american voltage source, l_={$V_{m,c}$}] (32,2.5);
+\filldraw (32,2.5) circle(1.5pt);
+\node[right, font=\tiny] at (32.15,2.5) {out\_cload};
+\draw (32,2.5) to[C, l_={$C_{load}$}, a^={\tiny 5\,fF}] (32,0);
+
+% ===============================================================
+% SUBCIRCUIT BOUNDARIES (dashed boxes)
+% ===============================================================
+\begin{scope}[on background layer]
+  \draw[dashed, rounded corners=4pt, gray!50, thick] (7.4,9.2) rectangle (11.6,14.2);
+  \node[font=\tiny, text=gray!50, anchor=south east] at (11.55,9.25) {XMP1: PMOS\_MEAS};
+
+  \draw[dashed, rounded corners=4pt, gray!50, thick] (7.4,0.3) rectangle (11.6,5.8);
+  \node[font=\tiny, text=gray!50, anchor=north east] at (11.55,5.75) {XMN1: NMOS\_MEAS};
+
+  \draw[dashed, rounded corners=4pt, gray!50, thick] (13.4,9.2) rectangle (17.6,14.2);
+  \node[font=\tiny, text=gray!50, anchor=south east] at (17.55,9.25) {XMP2: PMOS\_MEAS};
+
+  \draw[dashed, rounded corners=4pt, gray!50, thick] (13.4,0.3) rectangle (17.6,5.8);
+  \node[font=\tiny, text=gray!50, anchor=north east] at (17.55,5.75) {XMN2: NMOS\_MEAS};
+
+  \draw[dashed, rounded corners=4pt, gray!50, thick] (19.4,9.2) rectangle (23.6,14.2);
+  \node[font=\tiny, text=gray!50, anchor=south east] at (23.55,9.25) {XMP3: PMOS\_MEAS};
+
+  \draw[dashed, rounded corners=4pt, gray!50, thick] (19.4,0.3) rectangle (23.6,5.8);
+  \node[font=\tiny, text=gray!50, anchor=north east] at (23.55,5.75) {XMN3: NMOS\_MEAS};
+
+  \draw[dashed, rounded corners=4pt, gray!50, thick] (25.4,9.2) rectangle (29.6,14.2);
+  \node[font=\tiny, text=gray!50, anchor=south east] at (29.55,9.25) {XMP4: PMOS\_MEAS};
+
+  \draw[dashed, rounded corners=4pt, gray!50, thick] (25.4,0.3) rectangle (29.6,5.8);
+  \node[font=\tiny, text=gray!50, anchor=north east] at (29.55,5.75) {XMN4: NMOS\_MEAS};
+
+  \draw[dashed, rounded corners=4pt, gray!50, thick] (30.2,0.3) rectangle (34.3,5.8);
+  \node[font=\tiny, text=gray!50, anchor=north east] at (34.25,5.75) {XCload: C\_MEAS};
+\end{scope}
+
+\end{circuitikz}%
+}% end savebox
+\begin{minipage}[t]{\wd\circuitbox}
+\usebox{\circuitbox}
+
+\vspace{1.5em}
+\noindent\rule{\linewidth}{0.4pt}
+\vspace{1em}
+
+\end{minipage}
+
+\end{document}

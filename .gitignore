@@ -32,3 +32,17 @@ Thumbs.db
 misc/
 matrices/
 results/
+
+# Large datasets (regenerated locally; not for GitHub)
+dataset/
+
+# Stale code / script backups
+python/backup/
+python/backup2/
+python/backup3/
+scripts/backup2/
+scripts/backup3/
+
+# Generated logs
+logs/
+*.log

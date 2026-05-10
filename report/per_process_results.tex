@@ -1,0 +1,126 @@
+% =============================================================================
+% per_process_results.tex
+%
+% Per-process GAN performance summary and discussion of cross-process
+% inconsistency. Standalone fragment intended to be \input{} into Report.tex.
+% =============================================================================
+
+\section{Per-Process Performance}
+\label{sec:per-process}
+
+The GAN was trained independently on $10^5$ Monte Carlo simulations of the
+2-inverter circuit for each of the nine PTM process models. All runs used the
+same architecture, learning-rate schedule, and 100-epoch budget. Final
+metrics are summarized in Table~\ref{tab:per-process-metrics}. In every run
+the training loss and average test loss are within $\sim$1\% of each other,
+indicating the model is not overfitting --- the cross-process variation is
+driven by representation and target-distribution effects rather than
+generalization gap.
+
+\begin{table}[h]
+\centering
+\caption{Per-process GAN performance after 100 epochs on $10^5$ simulations
+of the 2-inverter circuit. Rows are sorted by mean relative error.}
+\label{tab:per-process-metrics}
+\begin{tabular}{lccc}
+\toprule
+Process       & Train Loss & Test Loss & Mean Rel. Err. ($I_{\text{target}}$) \\
+\midrule
+22nm\_LP      & 0.157 & 0.153 & 0.75  \\
+32nm\_LP      & 0.118 & 0.120 & 1.27  \\
+22nm\_HP      & 0.221 & 0.220 & 1.84  \\
+45nm\_LP      & 0.116 & 0.116 & 2.64  \\
+65nm\_bulk    & 0.178 & 0.180 & 2.93  \\
+32nm\_HP      & 0.187 & 0.189 & 3.22  \\
+45nm\_HP      & 0.202 & 0.201 & 9.06  \\
+90nm\_bulk    & 0.236 & 0.236 & 9.72  \\
+130nm\_bulk   & 0.306 & 0.306 & 36.72 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Why Performance Varies Across Processes}
+\label{sec:why-variance}
+
+Although the loss values cluster within a factor of two, the mean relative
+error spans nearly two orders of magnitude. Several factors contribute,
+roughly in decreasing order of suspected impact.
+
+\paragraph{Target dynamic range differs by process.}
+The PTM models span $V_{\text{th0}}$ from roughly $0.38\,\text{V}$ at 130nm
+to $0.69\,\text{V}$ at 22nm\_LP, with corresponding differences in $V_{dd}$,
+mobility $\mu_0$, and saturation velocity $V_{sat}$. Consequently
+$I_{\text{target}}$ spans very different magnitudes across processes. Mean
+\emph{relative} error is dominated by samples whose true current is small,
+so a fixed absolute residual produces wildly different MRE values across
+processes. The fact that MSE-style losses agree within $2\times$ while MRE
+varies by $\sim 50\times$ is a strong indicator that the headline metric, not
+the model, is producing most of the apparent variance.
+
+\paragraph{Variable input dimensionality.}
+Each PTM \texttt{.pm} file holds a different subset of BSIM parameters
+constant. The dataset finalization step removes constant columns, so the
+encoder sees a different feature-vector width per process. Hyperparameters
+(\texttt{embedding\_dim}, \texttt{hidden\_dim}, attention heads) were tuned
+for 22nm\_LP, which may not be appropriate for processes whose surviving
+feature set is meaningfully different.
+
+\paragraph{Physics-regime differences.}
+HP versus LP variants differ substantially in short-channel and leakage
+behavior. Older bulk nodes (65nm, 90nm, 130nm) operate in a long-channel
+saturated regime where the current depends on parameters that the GAT may
+weigh differently after per-process feature standardization.
+
+\paragraph{Per-process label normalization is decoupled from the loss.}
+The training pipeline fits \texttt{label\_log\_mean} and
+\texttt{label\_log\_std} independently for each dataset, so MSE is taken in
+a per-process log-z-score space. When predictions are back-transformed to
+compute MRE, processes with wider log-$\sigma$ amplify an identical
+z-score residual into a much larger relative error.
+
+\paragraph{Fixed training budget for unequal difficulty.}
+Every run used the same 100 epochs and learning-rate schedule. Training
+losses for the older bulk processes were still trending down at the final
+LR step (epoch 97), suggesting they are budget-limited rather than
+converged.
+
+\subsection{Proposed Improvements}
+\label{sec:future-improvements}
+
+The following directions are proposed for future work to reduce
+cross-process variance and improve overall accuracy.
+
+\begin{itemize}
+  \item \textbf{Predict normalized current.} Replace the raw
+    $I_{\text{target}}$ target with a process-normalized quantity such as
+    $I / (W \cdot \mu C_{\text{ox}} \cdot V_{dd}^2)$ or $I / I_{\text{on,ref}}$
+    so target distributions are comparable across processes.
+  \item \textbf{Use a scale-aware loss.} Replace MSE on log-z-scored current
+    with log-MAE or SMAPE so the loss directly tracks the relative-error
+    metric reported in the table.
+  \item \textbf{Standardize the input feature set.} Keep the union of all
+    BSIM parameters (zero-padding where constant per process) so the
+    encoder always sees a fixed-width input. This also enables
+    cross-process training.
+  \item \textbf{Process-conditioned training on the union of datasets.}
+    Concatenate all nine datasets and condition the model on a one-hot or
+    learned process embedding. With $\sim 9 \times 10^5$ samples the model
+    can learn process-invariant physics while specializing per process via
+    the conditioning vector. This is the most structurally promising
+    change.
+  \item \textbf{Shared encoder, per-process heads.} An alternative to
+    conditioning: a shared graph encoder feeding small, per-process
+    regression heads. Captures shared physics with process-specific output
+    scaling.
+  \item \textbf{Longer training and cosine schedule.} The LR was still
+    halving and the loss still decreasing at the end of the 100-epoch
+    runs; a cosine schedule with a longer budget should help especially on
+    older bulk nodes.
+  \item \textbf{Inspect tail behavior.} Report median and 90th-percentile
+    relative error in addition to the mean to determine how much of the
+    variance is driven by a small number of low-current outliers.
+  \item \textbf{asinh transform for near-zero currents.} An inverse
+    hyperbolic sine transform of the target handles small or negative
+    currents gracefully and avoids the divergent behavior of $\log$ near
+    zero.
+\end{itemize}

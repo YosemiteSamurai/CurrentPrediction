@@ -1,0 +1,89 @@
+\documentclass[10pt,twocolumn,letterpaper]{article}
+
+\usepackage{cvpr2016AuthorKit/cvpr}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{array}
+\usepackage{caption}
+\usepackage{cite}
+\usepackage{enumitem}
+\usepackage{float}
+\usepackage[top=1.1in, bottom=1.1in, left=1.3in, right=1.1in]{geometry}
+\usepackage{graphicx}
+\PassOptionsToPackage{hyphens}{url}
+\usepackage[breaklinks=true,bookmarks=false]{hyperref}
+\usepackage{tabularx}
+\usepackage{times}
+\usepackage{verbatim}
+
+\usepackage{etoolbox}
+\usepackage{adjustbox}
+
+\makeatletter
+\patchcmd{\@verbatim}
+  {\verbatim@font}
+  {\verbatim@font\tiny}
+  {}{}
+  
+\newcolumntype{P}[1]{>{\raggedright\arraybackslash\hangindent=1em\hangafter=1}p{#1}}
+\newcolumntype{Y}{>{\raggedright\arraybackslash\hangindent=1em\hangafter=1}X}
+  
+\renewcommand{\labelenumii}{\arabic{enumii}.}
+
+\cvprfinalcopy
+
+\begin{document}
+
+\title{Current Prediction in Analog Integrated Circuits
+
+Using Graph Attention Networks - Update}
+
+\author{Matthew Jones\\
+Oregon State University\\
+Corvallis, Oregon\\
+{\tt\small jonesm25@oregonstate.edu}
+}
+
+\maketitle
+
+\onecolumn
+\section{Introduction}
+\label{sec:intro}
+
+This is an update based on the Future Work section of the previous report.  Please refer to the it for details.
+
+\section{Per-Process Model Performance}
+\label{sec:per-process}
+
+The GAN was trained independently on $10^5$ Monte Carlo simulations of the 2-inverter circuit for each of the nine PTM process models. All runs used the same architecture, learning-rate schedule, and 100-epoch budget. Final metrics are summarized in Table~\ref{tab:per-process-metrics}. In every run the training loss and average test loss are within $\sim$1\% of each other, indicating the model is not overfitting --- the cross-process variation is driven by representation and target-distribution effects rather than generalization gap.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lccc}
+\toprule
+\textbf{Process} & \textbf{Train Loss} & \textbf{Test Loss} & \textbf{MRE} \\
+\midrule
+22nm\_LP      & 0.157 & 0.153 & 0.75  \\
+22nm\_HP      & 0.221 & 0.220 & 1.84  \\
+32nm\_LP      & 0.118 & 0.120 & 1.27  \\
+32nm\_HP      & 0.187 & 0.189 & 3.22  \\
+45nm\_LP      & 0.116 & 0.116 & 2.64  \\
+45nm\_HP      & 0.202 & 0.201 & 9.06  \\
+65nm\_bulk    & 0.178 & 0.180 & 2.93  \\
+90nm\_bulk    & 0.236 & 0.236 & 9.72  \\
+130nm\_bulk   & 0.306 & 0.306 & 36.72 \\
+\bottomrule
+\end{tabular}
+\caption{Per-process performance for each process (MRE = mean relative error)}
+\label{tab:per-process-metrics}
+\end{table}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.95\linewidth]{Current Prediction/figures/MeanRelError9.png}
+  \caption{Mean Relative Error over 100 epochs}
+  \label{fig:mre}
+\end{figure}
+
+
+\end{document}
