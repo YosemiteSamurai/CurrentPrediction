@@ -12,17 +12,23 @@
 #   python predict.py --input ../dataset/dataset2.json --checkpoint ../results/model.pt
 # =============================================================================
 
+
 import argparse
 import json
 import os
 import numpy as np
 import pandas as pd
 import torch
+import warnings
 from types import SimpleNamespace
 import models
 from gan import GAN
 from graph import Graph
 from dataset import SKEW_CODES, OPTION_CODES
+
+# Suppress CUDA and sklearn feature name warnings
+warnings.filterwarnings("ignore", message=".*CUDA initialization: CUDA unknown error.*")
+warnings.filterwarnings("ignore", message="X does not have valid feature names, but StandardScaler was fitted with feature names")
 
 CURRENT_LABELS = ["I_vdd", "I_gnd", "I_in", "I_out", "I_target"]
 I_TARGET_EDGE_INDEX = 3
@@ -30,11 +36,10 @@ CHECKPOINT_PATH = os.path.join(os.path.dirname(__file__), "..", "results", "mode
 
 def load_checkpoint(checkpoint_path, device):
 
-    checkpoint = torch.load(checkpoint_path, map_location=device)
+    checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=True)
     config = SimpleNamespace(**checkpoint["config"])
 
     gan = GAN(
-
 
         checkpoint["embedding_dim"],
         config.hidden_dim,
@@ -71,6 +76,8 @@ def scale_row(row: dict, scaler, feature_columns: list) -> dict:
 
     return {c: float(scaled[i]) for i, c in enumerate(feature_columns)}
 
+# Modified 2026-05-25: Updated to return embeddings, logits, and attention weights for each sample
+# to support privacy analysis (embedding inversion, edge reconstruction, membership inference).
 def predict_row(gan, config, label_log_mean, label_log_std, scaler, feature_columns, raw_row, device):
 
     row = encode_categoricals(raw_row)
@@ -90,18 +97,30 @@ def predict_row(gan, config, label_log_mean, label_log_std, scaler, feature_colu
     X_t = graph.X.to(device)
 
     with torch.no_grad():
-        z = gan.encode(X_t, A)
+        z, attn_weights = gan.encode(X_t, A, return_attention_weights=True)
         out = gan.decode(z, A).view(-1)
 
     i_target_pred = 10 ** (float(out[I_TARGET_EDGE_INDEX]) * label_log_std + label_log_mean)
-    return i_target_pred
+    # Return all outputs for saving
+    return i_target_pred, z.cpu().numpy(), out.cpu().numpy(), attn_weights
 
 def get_feature_columns(scaler, data_sample: dict) -> list:
 
-    drop = {"Design", "ID", "Skew"}  # dropped before scaler.fit in dataset.py
+    drop = {"Design", "ID", "Skew", "PVT"}  # dropped before scaler.fit in dataset.py
     cols = [k for k in data_sample.keys() if k not in drop]
-    return cols
+    # Only keep columns with numeric values
+    numeric_cols = []
+    for k in cols:
+        v = data_sample[k]
+        try:
+            float(v)
+            numeric_cols.append(k)
+        except (ValueError, TypeError):
+            pass
+    return numeric_cols
 
+# Modified 2026-05-25: Collects and saves embeddings, logits, and attention weights for all samples
+# as an .npz file in results/ for downstream privacy attacks.
 def main():
 
     parser = argparse.ArgumentParser(description="Run GCN current prediction inference")
@@ -125,23 +144,35 @@ def main():
     feature_columns = get_feature_columns(scaler, first_encoded)
     print("Running inference ...")
     rows_out = []
+    embeddings_list = []
+    logits_list = []
+    attn_weights_list = []
 
     for raw_row in data:
-
-        i_target = predict_row(gcn, config, label_log_mean, label_log_std,
-                               scaler, feature_columns, raw_row, device)
-        
+        i_target, embedding, logits, attn_weights = predict_row(
+            gcn, config, label_log_mean, label_log_std,
+            scaler, feature_columns, raw_row, device)
         rows_out.append({
-
             "ID": raw_row.get("ID"),
             "Design": raw_row.get("Design"),
             "I_target_pred": i_target,
-
         })
+        embeddings_list.append(embedding)
+        logits_list.append(logits)
+        attn_weights_list.append(attn_weights)
 
     df = pd.DataFrame(rows_out)
     df.to_csv(args.output, index=False)
     print(f"Predictions saved to {args.output}  ({len(df)} rows)")
+
+    # Name .npz output after the process/dataset for clarity
+    process_name = os.path.splitext(os.path.basename(args.output))[0].replace('predictions_', '')
+    npz_path = os.path.join(os.path.dirname(args.output), f"inference_outputs_{process_name}.npz")
+    np.savez(npz_path,
+             embeddings=np.array(embeddings_list, dtype=object),
+             logits=np.array(logits_list, dtype=object),
+             attention_weights=np.array(attn_weights_list, dtype=object))
+    print(f"Embeddings, logits, and attention weights saved to {npz_path}")
 
 if __name__ == "__main__":
     main()

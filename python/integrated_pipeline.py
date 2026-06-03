@@ -20,6 +20,7 @@
 # Designed to run from a submit node; all SLURM interaction is via sbatch.
 # =============================================================================
 
+
 import os
 import glob
 import math
@@ -27,6 +28,14 @@ import subprocess
 import re
 import sys
 import time
+import argparse
+
+
+# Parse command-line arguments
+parser = argparse.ArgumentParser(description="End-to-end pipeline for CurrentPrediction")
+parser.add_argument('--no-slurm', action='store_true', help='Run training locally without SLURM')
+parser.add_argument('--run-tag', default='', help='Tag appended to saved artifacts for repeated training runs')
+args = parser.parse_args()
 
 # Clear the screen
 os.system('cls' if os.name == 'nt' else 'clear')
@@ -36,47 +45,82 @@ MODELS_DIR = os.path.join(os.path.dirname(__file__), '..', 'models')
 model_files = glob.glob(os.path.join(MODELS_DIR, '*.pm'))
 
 def train_model(dataset_path, design='2inv'):
-    """Submit scripts/train.sbatch as a SLURM job to train the GAN on the
-    given dataset. Returns the SLURM job ID. Does not wait for completion."""
+    """Train the GAN on the given dataset, either via SLURM or locally."""
     dataset_name = os.path.splitext(os.path.basename(dataset_path))[0]
     project_root_local = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
     train_sbatch = os.path.join(project_root_local, 'scripts', 'train.sbatch')
+    sweep_py = os.path.join(project_root_local, 'python', 'sweep.py')
 
-    # SLURM rejects scripts with DOS line endings. If the file was checked out
-    # (or edited) on Windows, normalize it to LF in-place before submitting.
-    try:
-        with open(train_sbatch, 'rb') as f:
-            data = f.read()
-        if b'\r\n' in data:
-            with open(train_sbatch, 'wb') as f:
-                f.write(data.replace(b'\r\n', b'\n'))
-    except Exception as e:
-        print(f"Warning: Could not normalize line endings on {train_sbatch}: {e}")
+    if args.no_slurm:
+        print(f"[NO-SLURM MODE] Running training locally: {sweep_py}")
+        # Import sweep.py as a module and call main(config)
+        import importlib.util
+        import types
+        import sys as _sys
+        sweep_spec = importlib.util.spec_from_file_location("sweep", sweep_py)
+        sweep = importlib.util.module_from_spec(sweep_spec)
+        _sys.modules["sweep"] = sweep
+        sweep_spec.loader.exec_module(sweep)
+        # Build config object as in sweep.py
+        config = sweep.SimpleNamespace(
+            batch_size=32,
+            model='block',
+            lr=0.0001,
+            layers=3,
+            hidden_dim=64,
+            heads=4,
+            test_size=0.3,
+            epochs=100,
+            edges_per_graph=7,
+            target_edge_idx=3,
+        )
+        # Set DATASET and DESIGN environment variables for sweep.py
+        os.environ['DATASET'] = dataset_name
+        os.environ['DESIGN'] = design
+        os.environ['RUN_TAG'] = args.run_tag  # original: os.environ['DESIGN'] = design
+        try:
+            sweep.main(config)
+        except Exception as e:
+            print(f"[ERROR] Local training failed: {e}", file=sys.stderr)
+            sys.exit(1)
+        print(f"[NO-SLURM MODE] Training complete. Check results/model_*.pt for output.")
+        return None
+    else:
+        # SLURM rejects scripts with DOS line endings. If the file was checked out
+        # (or edited) on Windows, normalize it to LF in-place before submitting.
+        try:
+            with open(train_sbatch, 'rb') as f:
+                data = f.read()
+            if b'\r\n' in data:
+                with open(train_sbatch, 'wb') as f:
+                    f.write(data.replace(b'\r\n', b'\n'))
+        except Exception as e:
+            print(f"Warning: Could not normalize line endings on {train_sbatch}: {e}")
 
-    cmd = [
-        'sbatch', '--parsable',
-        f'--export=DATASET={dataset_name},DESIGN={design}',
-        train_sbatch,
-    ]
-    print(f"Submitting training job for dataset '{dataset_name}'...")
-    result = subprocess.run(cmd, stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE, universal_newlines=True)
-    if result.returncode != 0:
-        print(f"sbatch failed (exit {result.returncode}).", file=sys.stderr)
-        if result.stdout.strip():
-            print(f"stdout: {result.stdout.strip()}", file=sys.stderr)
-        if result.stderr.strip():
-            print(f"stderr: {result.stderr.strip()}", file=sys.stderr)
-        print(f"command: {' '.join(cmd)}", file=sys.stderr)
-        sys.exit(result.returncode)
-    job_id = result.stdout.strip()
-    print(f"\nTraining job submitted: job ID {job_id}")
-    print(f"  Monitor with:  squeue -j {job_id}")
-    print(f"  Output log:    logs/slurm-{job_id}.out")
-    print(f"  Error log:     logs/slurm-{job_id}.err")
-    process_name = dataset_name[len('dataset_'):] if dataset_name.startswith('dataset_') else dataset_name
-    print(f"  Checkpoint:    results/model_{process_name}.pt (when complete)\n")
-    return job_id
+        cmd = [
+            'sbatch', '--parsable',
+            f'--export=DATASET={dataset_name},DESIGN={design},RUN_TAG={args.run_tag}',
+            train_sbatch,
+        ]
+        print(f"Submitting training job for dataset '{dataset_name}'...")
+        result = subprocess.run(cmd, stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE, universal_newlines=True)
+        if result.returncode != 0:
+            print(f"sbatch failed (exit {result.returncode}).", file=sys.stderr)
+            if result.stdout.strip():
+                print(f"stdout: {result.stdout.strip()}", file=sys.stderr)
+            if result.stderr.strip():
+                print(f"stderr: {result.stderr.strip()}", file=sys.stderr)
+            print(f"command: {' '.join(cmd)}", file=sys.stderr)
+            sys.exit(result.returncode)
+        job_id = result.stdout.strip()
+        print(f"\nTraining job submitted: job ID {job_id}")
+        print(f"  Monitor with:  squeue -j {job_id}")
+        print(f"  Output log:    logs/slurm-{job_id}.out")
+        print(f"  Error log:     logs/slurm-{job_id}.err")
+        process_name = dataset_name[len('dataset_'):] if dataset_name.startswith('dataset_') else dataset_name
+        print(f"  Checkpoint:    results/model_{process_name}.pt (when complete)\n")
+        return job_id
 
 def extract_nm(filename):
     match = re.match(r'(\d+)nm', filename)
@@ -305,20 +349,25 @@ for f in os.listdir(sims_dir):
     except Exception as e:
         print(f"Warning: Could not delete {fp}: {e}")
 
-submit_res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                            universal_newlines=True, check=True)
-sys.stdout.write(submit_res.stdout)
-run_info = _parse_submit_output(submit_res.stdout)
-if not {'ARRAY_JOB', 'JOBS_PER_TASK', 'NUM_SIMS'}.issubset(run_info):
-    print("ERROR: Could not parse submit_sims.sh output for ARRAY_JOB / "
-          "JOBS_PER_TASK / NUM_SIMS. Retry-on-shortfall will be unavailable.",
-          file=sys.stderr)
-    sys.exit(1)
-array_job_id = run_info['ARRAY_JOB']
-final_job_id = run_info.get('FINAL_JOB')
-jobs_per_task = int(run_info['JOBS_PER_TASK'])
-num_sims = int(run_info['NUM_SIMS'])
-print(f"\nSLURM job submitted for simulation and dataset generation: {dataset_name}.json\n")
+
+# If --no-slurm is set, print a warning and skip simulation phase (unless you have a local fallback)
+if args.no_slurm:
+    print("[NO-SLURM MODE] Simulation phase is not supported without SLURM. Please generate the dataset manually if needed.")
+else:
+    submit_res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                universal_newlines=True, check=True)
+    sys.stdout.write(submit_res.stdout)
+    run_info = _parse_submit_output(submit_res.stdout)
+    if not {'ARRAY_JOB', 'JOBS_PER_TASK', 'NUM_SIMS'}.issubset(run_info):
+        print("ERROR: Could not parse submit_sims.sh output for ARRAY_JOB / "
+              "JOBS_PER_TASK / NUM_SIMS. Retry-on-shortfall will be unavailable.",
+              file=sys.stderr)
+        sys.exit(1)
+    array_job_id = run_info['ARRAY_JOB']
+    final_job_id = run_info.get('FINAL_JOB')
+    jobs_per_task = int(run_info['JOBS_PER_TASK'])
+    num_sims = int(run_info['NUM_SIMS'])
+    print(f"\nSLURM job submitted for simulation and dataset generation: {dataset_name}.json\n")
 
 # Step 5: Wait for dataset file to exist, then sanity-check its row
 # count. If the run came up short (e.g. some array tasks crashed),

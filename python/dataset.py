@@ -23,49 +23,106 @@
 #   - test: Evaluates MAPE, mean relative error, and min/max relative error
 # =============================================================================
 
+print("[dataset] import step: json/os/numpy", flush=True)
 import json
 import os
+import time
 import numpy as np
+
+print("[dataset] import step: pandas", flush=True)
 import pandas as pd
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
+
+print("[dataset] import step: torch", flush=True)
 from torch.utils.data import Dataset, DataLoader
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
+print("[dataset] import step: models", flush=True)
 import models
+
+print("[dataset] import step: graph", flush=True)
 from graph import Graph, batch_graph
 
 print("[dataset] imports complete", flush=True)
 
+
+class NumpyStandardScaler:
+    """Small sklearn-like scaler used for training/inference compatibility."""
+
+    def __init__(self):
+        self.mean_ = None
+        self.scale_ = None
+
+    def fit(self, X):
+        X = np.asarray(X, dtype=np.float64)
+        self.mean_ = X.mean(axis=0)
+        self.scale_ = X.std(axis=0)
+        # Avoid divide-by-zero for constant columns.
+        self.scale_[self.scale_ == 0] = 1.0
+        return self
+
+    def transform(self, X):
+        X = np.asarray(X, dtype=np.float64)
+        return (X - self.mean_) / self.scale_
+
+    def fit_transform(self, X):
+        return self.fit(X).transform(X)
+
+
+# Allow override of dataset path via environment variable (set by sweep.py or pipeline)
+DATASET_PATH = os.environ.get('DATASET_PATH', '').strip()  # original: DATASET_PATH = os.environ.get('DATASET_PATH', '').strip()
+DATASET_NAME = os.environ.get('DATASET', '').strip()
 _dataset_dir = os.path.join(os.path.dirname(__file__), "..", "dataset")
 
-_process_datasets = sorted(
+_dataset_load_started = time.perf_counter()
 
-    os.path.join(_dataset_dir, f) for f in os.listdir(_dataset_dir)
-    if f.endswith("_dataset.json")
-
-)
-
-if _process_datasets:
-
-    DATA_FILE = _process_datasets[0]
-    print(f"[dataset] auto-selected dataset: {os.path.basename(DATA_FILE)}", flush=True)
-
+if DATASET_PATH and os.path.exists(DATASET_PATH):
+    DATA_FILE = DATASET_PATH
+    print(f"[dataset] using DATASET_PATH: {DATA_FILE}", flush=True)
+elif DATASET_NAME:
+    candidate = DATASET_NAME
+    if not os.path.isabs(candidate):
+        candidate = os.path.join(_dataset_dir, candidate)
+    if not candidate.endswith('.json'):
+        candidate = candidate + '.json'
+    if os.path.exists(candidate):
+        DATA_FILE = candidate
+        print(f"[dataset] using DATASET: {DATA_FILE}", flush=True)
+    else:
+        raise FileNotFoundError(f"[dataset] DATASET points to missing file: {candidate}")
 else:
+    _process_datasets = sorted(
+        os.path.join(_dataset_dir, f) for f in os.listdir(_dataset_dir)
+        if f.startswith("dataset_") and f.endswith(".json")
+    )
+    if _process_datasets:
+        DATA_FILE = _process_datasets[0]
+        print(f"[dataset] auto-selected dataset: {os.path.basename(DATA_FILE)}", flush=True)
+    else:
+        DATA_FILE = os.path.join(_dataset_dir, "dataset.json")
+        print(f"[dataset] falling back to dataset.json", flush=True)
 
-    DATA_FILE = os.path.join(_dataset_dir, "dataset.json")
-    print(f"[dataset] falling back to dataset.json", flush=True)
 
-print("[dataset] loading JSON...", flush=True)
-
-with open(DATA_FILE, "r") as f:
-    data = json.load(f)
-
-print(f"[dataset] loaded {len(data)} rows", flush=True)
+print(f"[dataset] loading JSON from: {DATA_FILE}", flush=True)
+try:
+    file_size = os.path.getsize(DATA_FILE)
+    print(f"[dataset] file size: {file_size} bytes", flush=True)
+    with open(DATA_FILE, "r") as f:
+        lines = f.readlines()
+        print("[dataset] last 5 lines before loading:")
+        for l in lines[-5:]:
+            print(l.rstrip())
+    with open(DATA_FILE, "r") as f:
+        data = json.load(f)
+    print(f"[dataset] loaded {len(data)} rows", flush=True)
+except Exception as e:
+    print(f"[dataset] ERROR loading JSON: {e}", flush=True)
+    raise
 
 data_frame = pd.DataFrame(data)
-data_frame = data_frame.drop(columns=["ID", "PVT"])
+row_ids = data_frame['ID'].reset_index(drop=True) if 'ID' in data_frame.columns else None
+data_frame = data_frame.drop(columns=["ID", "PVT"])  # original: data_frame = data_frame.drop(columns=["ID", "PVT"])
 design_col = data_frame['Design']
 data_frame = data_frame.drop(columns=["Design"])
 
@@ -96,7 +153,7 @@ log_label_df = pd.DataFrame(
     index=label_df.index
 )
 
-scaler = StandardScaler()  # saved in checkpoint for inference feature scaling
+scaler = NumpyStandardScaler()  # saved in checkpoint for inference feature scaling
 scaled_data = scaler.fit_transform(data_frame)
 data_frame = pd.DataFrame(scaled_data, columns=data_frame.columns)
 data_frame['Design'] = design_col
@@ -109,6 +166,8 @@ print("infomation")
 print(data_frame.info())
 print("size of DF")
 print(data_frame.shape)
+DATASET_LOAD_SECONDS = time.perf_counter() - _dataset_load_started
+print(f"[dataset] data load + preprocessing time: {DATASET_LOAD_SECONDS:.2f}s", flush=True)
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 print(f"[dataset] device: {device}", flush=True)

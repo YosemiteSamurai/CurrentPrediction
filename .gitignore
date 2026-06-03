@@ -46,3 +46,7 @@ scripts/backup3/
 # Generated logs
 logs/
 *.log
+
+# Privacy attack artifacts (keep scripts, ignore large outputs)
+privacy/*.npz
+privacy/*.csv

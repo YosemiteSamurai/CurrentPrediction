@@ -136,5 +136,3 @@
 
 +rshg    = 0.4             gbmin   = 1e-010          rbpb    = 5               rbpd    = 15            
 +rbps    = 15              rbdb    = 15              rbsb    = 15              ngcon   = 1             
-
-

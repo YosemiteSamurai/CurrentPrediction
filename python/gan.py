@@ -48,19 +48,50 @@ class GAN(torch.nn.Module):
 
         )
 
-    def encode(self, x, edge_index):
+    # Modified 2026-05-25: Added return_attention_weights option to output attention weights from all 
+    # GATv2Conv layers for privacy analysis (embedding inversion, edge reconstruction, membership inference).
+    def encode(self, x, edge_index, return_attention_weights=False):
 
-        x = self.conv0(x, edge_index)
+        attn_weights = []
+
+        # Input layer
+        if return_attention_weights:
+
+            x, attn0 = self.conv0(x, edge_index, return_attention_weights=True)
+            attn_weights.append(attn0[1].detach().cpu().numpy())
+
+        else:
+            x = self.conv0(x, edge_index)
+
         x = F.elu(x)
 
+        # Hidden layers
         for layer in self.extra:
 
-            x = layer(x, edge_index)
+            if return_attention_weights:
+
+                x, attn = layer(x, edge_index, return_attention_weights=True)
+                attn_weights.append(attn[1].detach().cpu().numpy())
+
+            else:
+                x = layer(x, edge_index)
+
             x = F.elu(x)
 
-        x = self.convF(x, edge_index)
+        # Output layer
+        if return_attention_weights:
 
-        return x
+            x, attnF = self.convF(x, edge_index, return_attention_weights=True)
+            attn_weights.append(attnF[1].detach().cpu().numpy())
+
+        else:
+            x = self.convF(x, edge_index)
+
+        if return_attention_weights:
+            return x, attn_weights
+        
+        else:
+            return x
 
     def decode(self, z, edge_label_index):
 

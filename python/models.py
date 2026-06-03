@@ -20,8 +20,12 @@ import numpy as np
 import torch
 
 def _f(data, key):
-
-    return float(data[key]) if key in data.index else 0.0
+    # Support both pandas Series (data.index) and dict (data.keys())
+    if hasattr(data, 'index'):
+        exists = key in data.index
+    else:
+        exists = key in data
+    return float(data[key]) if exists else 0.0
 
 def block_2inv(data, design):
 
