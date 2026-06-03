@@ -20,31 +20,37 @@ set -euo pipefail
 
 TOKEN="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
 
-build_auth_url() {
+build_push_url() {
   local url="$1"
 
-  # Convert HTTPS GitHub remote to token-authenticated URL when a token exists.
-  # Example:
-  #   https://github.com/owner/repo.git
-  # ->
-  #   https://x-access-token:<token>@github.com/owner/repo.git
-  if [[ -n "$TOKEN" && "$url" =~ ^https://github\.com/(.+)$ ]]; then
-    printf 'https://x-access-token:%s@github.com/%s' "$TOKEN" "${BASH_REMATCH[1]}"
-    return 0
-  fi
-
-  # Convert SSH GitHub remote to token-authenticated HTTPS URL when token exists.
+  # Convert SSH GitHub remote to HTTPS when a token exists.
   # Example:
   #   git@github.com:owner/repo.git
   # ->
-  #   https://x-access-token:<token>@github.com/owner/repo.git
+  #   https://github.com/owner/repo.git
   if [[ -n "$TOKEN" && "$url" =~ ^git@github\.com:(.+)$ ]]; then
-    printf 'https://x-access-token:%s@github.com/%s' "$TOKEN" "${BASH_REMATCH[1]}"
+    printf 'https://github.com/%s' "${BASH_REMATCH[1]}"
     return 0
   fi
 
-  # Keep SSH remotes and all non-GitHub URLs unchanged.
+  # Keep original URL for all other cases.
   printf '%s' "$url"
+}
+
+git_with_auth() {
+  local origin="$1"
+  shift
+
+  # Use HTTP Authorization header for GitHub HTTPS remotes when token is provided.
+  # This avoids embedding tokens in URLs (safer, and no URL parsing issues with ':').
+  if [[ -n "$TOKEN" && "$origin" =~ ^https://github\.com/ ]]; then
+    local basic
+    basic="$(printf 'x-access-token:%s' "$TOKEN" | base64 | tr -d '\n')"
+    git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $basic" "$@"
+    return
+  fi
+
+  git "$@"
 }
 
 if [[ $# -lt 1 ]]; then
@@ -56,7 +62,7 @@ TAG="$1"
 shift
 MSG="${*:-}"
 ORIGIN_URL="$(git remote get-url origin)"
-AUTH_PUSH_URL="$(build_auth_url "$ORIGIN_URL")"
+PUSH_URL="$(build_push_url "$ORIGIN_URL")"
 
 # Disable interactive credential prompts when a token is provided.
 if [[ -n "$TOKEN" ]]; then
@@ -71,7 +77,7 @@ if git rev-parse "$TAG" >/dev/null 2>&1; then
   echo "ERROR: Tag '$TAG' already exists locally."
   exit 1
 fi
-if git ls-remote --tags "$AUTH_PUSH_URL" "refs/tags/$TAG" | grep -q .; then
+if git_with_auth "$PUSH_URL" ls-remote --tags "$PUSH_URL" "refs/tags/$TAG" | grep -q .; then
   echo "ERROR: Tag '$TAG' already exists on origin."
   exit 1
 fi
@@ -108,15 +114,15 @@ git tag -a "$TAG" -m "$TAG"
 
 echo
 echo "==> Pushing branch $BRANCH"
-git push "$AUTH_PUSH_URL" "$BRANCH"
+git_with_auth "$PUSH_URL" push "$PUSH_URL" "$BRANCH"
 
 echo
 echo "==> Pushing tag $TAG"
-git push "$AUTH_PUSH_URL" "$TAG"
+git_with_auth "$PUSH_URL" push "$PUSH_URL" "$TAG"
 
 echo
 echo "==> Done."
 git log --oneline -3
 echo
 echo "Remote refs:"
-git ls-remote "$AUTH_PUSH_URL" "refs/heads/$BRANCH" "refs/tags/$TAG"
+git_with_auth "$PUSH_URL" ls-remote "$PUSH_URL" "refs/heads/$BRANCH" "refs/tags/$TAG"
