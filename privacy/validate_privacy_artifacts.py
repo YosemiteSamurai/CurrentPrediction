@@ -85,6 +85,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", required=True, help="Dataset JSON/CSV file or dataset name")
     parser.add_argument("--privacy-dir", default=None, help="Directory containing privacy artifacts")
+    parser.add_argument("--tag", default="", help="Optional run tag suffix used in artifact names")
     parser.add_argument("--test-size", type=float, default=0.3, help="Train/test split fraction used by sweep.py")
     parser.add_argument("--seed", type=int, default=42, help="Random seed used by sweep.py")
     args = parser.parse_args()
@@ -99,23 +100,29 @@ def main():
         raise FileNotFoundError(f"Dataset not found: {dataset_path}")
 
     process = dataset_process_name(dataset_path)
+    tag_suffix = f"_{args.tag.strip()}" if args.tag.strip() else ""
     print(f"[validate_privacy_artifacts] dataset: {dataset_path}")
     print(f"[validate_privacy_artifacts] process: {process}")
+    print(f"[validate_privacy_artifacts] tag: {args.tag.strip() or '<none>'}")
     print(f"[validate_privacy_artifacts] privacy_dir: {privacy_dir}")
 
     frame = load_dataframe(dataset_path)
     if "ID" not in frame.columns:
         raise KeyError("Dataset does not contain an 'ID' column")
 
-    train_ids_path = privacy_dir / "train_ids.npy"
+    train_ids_path = privacy_dir / f"train_ids_{process}{tag_suffix}.npy"  # original: train_ids_path = privacy_dir / "train_ids.npy"
+    legacy_train_ids_path = privacy_dir / "train_ids.npy"
     if train_ids_path.exists():
         train_ids = np.load(train_ids_path, allow_pickle=True)
-        print(f"[validate_privacy_artifacts] found train_ids.npy ({train_ids.shape[0]} IDs)")
+        print(f"[validate_privacy_artifacts] found {train_ids_path.name} ({train_ids.shape[0]} IDs)")  # original: print(f"[validate_privacy_artifacts] found train_ids.npy ({train_ids.shape[0]} IDs)")
+    elif legacy_train_ids_path.exists():
+        train_ids = np.load(legacy_train_ids_path, allow_pickle=True)
+        print(f"[validate_privacy_artifacts] found legacy {legacy_train_ids_path.name} ({train_ids.shape[0]} IDs)")
     else:
         train_frame, _ = split_train_test(frame, test_size=args.test_size, seed=args.seed)
         train_ids = train_frame["ID"].to_numpy()
         np.save(train_ids_path, train_ids)
-        print(f"[validate_privacy_artifacts] wrote train_ids.npy ({train_ids.shape[0]} IDs)")
+        print(f"[validate_privacy_artifacts] wrote {train_ids_path.name} ({train_ids.shape[0]} IDs)")  # original: print(f"[validate_privacy_artifacts] wrote train_ids.npy ({train_ids.shape[0]} IDs)")
 
     membership_labels_path = privacy_dir / f"membership_labels_{process}.npz"
     if not membership_labels_path.exists():

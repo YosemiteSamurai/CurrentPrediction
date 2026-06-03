@@ -84,6 +84,53 @@ def split_train_test(df, test_size=0.3, seed=42):
     test_df = df.iloc[test_idx].reset_index(drop=True)
     return train_df, test_df
 
+def run_inference_and_copy(process_name, run_suffix, dataset_path, model_path, metadata_path=None):
+    """Run predict.py for a trained checkpoint and copy privacy artifacts."""
+    results_dir = os.path.join(os.path.dirname(__file__), "..", "results")
+    os.makedirs(results_dir, exist_ok=True)
+    privacy_dir = os.path.join(os.path.dirname(__file__), '..', 'privacy')
+    os.makedirs(privacy_dir, exist_ok=True)
+
+    # Use the same dataset and model for prediction
+    predict_py = os.path.join(os.path.dirname(__file__), "predict.py")
+    output_csv = os.path.join(privacy_dir, f"predictions_{process_name}{run_suffix}.csv")  # original: output_csv = os.path.join(results_dir, f"predictions_{process_name}{run_suffix}.csv")
+
+    # Call predict.py with correct arguments
+    import subprocess
+    predict_cmd = [
+        sys.executable, predict_py,
+        "--input", dataset_path,
+        "--output", output_csv,
+        "--checkpoint", model_path
+    ]
+    print(f"\nRunning inference for privacy outputs...\n{' '.join(predict_cmd)}", flush=True)
+    subprocess.run(predict_cmd, check=True)
+
+    # Keep only one copy of non-model artifacts in privacy/.
+    import shutil
+
+    # predictions CSV is already written to privacy_dir
+    print(f"[sweep] predictions saved in privacy: {output_csv}")
+
+    # inference_outputs_*.npz is written next to output_csv (privacy_dir)
+    npz_name = f"inference_outputs_{process_name}{run_suffix}.npz"
+    npz_path = os.path.join(privacy_dir, npz_name)
+    if os.path.exists(npz_path):
+        print(f"[sweep] inference outputs saved in privacy: {npz_path}")
+    else:
+        print(f"[sweep] WARNING: {npz_path} not found in privacy/")
+
+    # Copy model_*.pt
+    model_dst = os.path.join(privacy_dir, f"model_{process_name}{run_suffix}.pt")
+    shutil.copy2(model_path, model_dst)
+    print(f"[sweep] Copied {model_path} to {model_dst}")
+
+    # run_metadata is stored in privacy only; just verify it exists.
+    if metadata_path and os.path.exists(metadata_path):
+        print(f"[sweep] metadata saved in privacy: {metadata_path}")
+    else:
+        print(f"[sweep] WARNING: metadata not found at {metadata_path}; skipping metadata copy")
+
 def main(config):
 
     print("[sweep] importing torch...", flush=True)
@@ -106,6 +153,29 @@ def main(config):
     run_tag = config.run_tag or os.environ.get('RUN_TAG', '').strip()
     run_suffix = f"_{run_tag}" if run_tag else ""
 
+    # Determine process name and artifact paths for output naming
+    dataset_path = os.environ.get('DATASET_PATH', '')
+    if dataset_path:
+        process_name = os.path.splitext(os.path.basename(dataset_path))[0].replace('dataset_', '')
+    else:
+        process_name = 'unknown'
+    results_dir = os.path.join(os.path.dirname(__file__), "..", "results")
+    os.makedirs(results_dir, exist_ok=True)
+    privacy_dir = os.path.join(os.path.dirname(__file__), '..', 'privacy')
+    os.makedirs(privacy_dir, exist_ok=True)
+    model_path = os.path.join(results_dir, f"model_{process_name}{run_suffix}.pt")
+    metadata_path = os.path.join(privacy_dir, f"run_metadata_{process_name}{run_suffix}.json")  # original: metadata_path = os.path.join(results_dir, f"run_metadata_{process_name}{run_suffix}.json")
+
+    inference_only = os.environ.get('INFERENCE_ONLY', '').strip().lower() in {'1', 'true', 'yes'}
+    if inference_only:
+        print(f"[sweep] INFERENCE_ONLY=1: skipping training and reusing checkpoint {model_path}", flush=True)
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(f"[sweep] INFERENCE_ONLY requested but checkpoint not found: {model_path}")
+        if not dataset_path:
+            raise ValueError("[sweep] INFERENCE_ONLY requested but DATASET_PATH is empty")
+        run_inference_and_copy(process_name, run_suffix, dataset_path, model_path, metadata_path)
+        return
+
     run = wandb.init(
 
         entity="yosemitesamurai",
@@ -127,13 +197,13 @@ def main(config):
     # Save training IDs for membership inference ground-truth
     privacy_dir = os.path.join(os.path.dirname(__file__), '..', 'privacy')
     os.makedirs(privacy_dir, exist_ok=True)
-    train_ids_path = os.path.join(privacy_dir, 'train_ids.npy')
+    train_ids_path = os.path.join(privacy_dir, f'train_ids_{process_name}{run_suffix}.npy')  # original: train_ids_path = os.path.join(privacy_dir, 'train_ids.npy')
     if 'ID' in train_df.columns:
         import numpy as np
         np.save(train_ids_path, train_df['ID'].to_numpy())
         print(f"[sweep] Saved training IDs to {train_ids_path}")
     else:
-        print("[sweep] WARNING: No 'ID' column found in training data; train_ids.npy not saved.")
+        print(f"[sweep] WARNING: No 'ID' column found in training data; {train_ids_path} not saved.")  # original: print("[sweep] WARNING: No 'ID' column found in training data; train_ids.npy not saved.")
 
     # Keep ID out of model inputs; it is only needed for privacy membership labels.
     if 'ID' in train_df.columns:
@@ -194,15 +264,15 @@ def main(config):
         print(f"Epoch time: {epoch_seconds:.2f}s", flush=True)
         epoch_times.append(epoch_seconds)
 
-    results_dir = os.path.join(os.path.dirname(__file__), "..", "results")
-    os.makedirs(results_dir, exist_ok=True)
+    results_dir = os.path.join(os.path.dirname(__file__), "..", "results")  # original: results_dir = os.path.join(os.path.dirname(__file__), "..", "results")
+    os.makedirs(results_dir, exist_ok=True)  # original: os.makedirs(results_dir, exist_ok=True)
 
     # Determine process name for output naming
-    dataset_path = os.environ.get('DATASET_PATH', '')
+    dataset_path = os.environ.get('DATASET_PATH', '')  # original: dataset_path = os.environ.get('DATASET_PATH', '')
     if dataset_path:
-        process_name = os.path.splitext(os.path.basename(dataset_path))[0].replace('dataset_', '')
+        process_name = os.path.splitext(os.path.basename(dataset_path))[0].replace('dataset_', '')  # original: process_name = os.path.splitext(os.path.basename(dataset_path))[0].replace('dataset_', '')
     else:
-        process_name = 'unknown'
+        process_name = 'unknown'  # original: process_name = 'unknown'
 
     checkpoint = {
         "model_state_dict": gcn.state_dict(),
@@ -213,7 +283,7 @@ def main(config):
         "scaler": scaler,
     }
 
-    model_path = os.path.join(results_dir, f"model_{process_name}{run_suffix}.pt")
+    model_path = os.path.join(results_dir, f"model_{process_name}{run_suffix}.pt")  # original: model_path = os.path.join(results_dir, f"model_{process_name}{run_suffix}.pt")
     torch.save(checkpoint, model_path)
     print(f"Model saved to {model_path}", flush=True)
 
@@ -234,52 +304,12 @@ def main(config):
         "layers": config.layers,
         "heads": config.heads,
     }
-    metadata_path = os.path.join(results_dir, f"run_metadata_{process_name}{run_suffix}.json")
+    metadata_path = os.path.join(privacy_dir, f"run_metadata_{process_name}{run_suffix}.json")  # original: metadata_path = os.path.join(results_dir, f"run_metadata_{process_name}{run_suffix}.json")  # original: metadata_path = os.path.join(results_dir, f"run_metadata_{process_name}{run_suffix}.json")
     with open(metadata_path, 'w') as metadata_file:
         json.dump(metadata, metadata_file, indent=2)
     print(f"[sweep] Saved run metadata to {metadata_path}", flush=True)
 
-    # Always run inference after training
-    # Use the same dataset and model for prediction
-    predict_py = os.path.join(os.path.dirname(__file__), "predict.py")
-    output_csv = os.path.join(results_dir, f"predictions_{process_name}.csv")
-    if run_tag:
-        output_csv = os.path.join(results_dir, f"predictions_{process_name}{run_suffix}.csv")
-    # Call predict.py with correct arguments
-    import subprocess
-    predict_cmd = [
-        sys.executable, predict_py,
-        "--input", dataset_path,
-        "--output", output_csv,
-        "--checkpoint", model_path
-    ]
-    print(f"\nRunning inference for privacy outputs...\n{' '.join(predict_cmd)}", flush=True)
-    subprocess.run(predict_cmd, check=True)
-
-    # Copy privacy-related files to privacy/
-    privacy_dir = os.path.join(os.path.dirname(__file__), '..', 'privacy')
-    os.makedirs(privacy_dir, exist_ok=True)
-    import shutil
-    # Copy predictions CSV
-    privacy_csv = os.path.join(privacy_dir, f"predictions_{process_name}{run_suffix}.csv")
-    shutil.copy2(output_csv, privacy_csv)
-    print(f"[sweep] Copied {output_csv} to {privacy_csv}")
-    # Copy inference_outputs_*.npz
-    npz_name = f"inference_outputs_{process_name}{run_suffix}.npz"
-    npz_src = os.path.join(results_dir, npz_name)
-    npz_dst = os.path.join(privacy_dir, npz_name)
-    if os.path.exists(npz_src):
-        shutil.copy2(npz_src, npz_dst)
-        print(f"[sweep] Copied {npz_src} to {npz_dst}")
-    else:
-        print(f"[sweep] WARNING: {npz_src} not found; not copied to privacy/")
-    # Copy model_*.pt
-    model_dst = os.path.join(privacy_dir, f"model_{process_name}{run_suffix}.pt")
-    shutil.copy2(model_path, model_dst)
-    print(f"[sweep] Copied {model_path} to {model_dst}")
-    metadata_dst = os.path.join(privacy_dir, f"run_metadata_{process_name}{run_suffix}.json")
-    shutil.copy2(metadata_path, metadata_dst)
-    print(f"[sweep] Copied {metadata_path} to {metadata_dst}")
+    run_inference_and_copy(process_name, run_suffix, dataset_path, model_path, metadata_path)
     print(f"[sweep] total training time: {time.perf_counter() - training_started:.2f}s", flush=True)
     run.finish()
 

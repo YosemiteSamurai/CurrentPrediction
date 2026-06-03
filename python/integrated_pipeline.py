@@ -34,7 +34,8 @@ import argparse
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description="End-to-end pipeline for CurrentPrediction")
 parser.add_argument('--no-slurm', action='store_true', help='Run training locally without SLURM')
-parser.add_argument('--run-tag', default='', help='Tag appended to saved artifacts for repeated training runs')
+parser.add_argument('--run-tag', default='', help='Run name tag appended to saved artifacts (default: baseline)')  # original: parser.add_argument('--run-tag', default='', help='Run name tag appended to saved artifacts (use baseline for default filenames)')
+parser.add_argument('--resume-inference-only', action='store_true', help='Skip training and rerun only inference/artifact export from existing checkpoint')
 args = parser.parse_args()
 
 # Clear the screen
@@ -44,15 +45,18 @@ os.system('cls' if os.name == 'nt' else 'clear')
 MODELS_DIR = os.path.join(os.path.dirname(__file__), '..', 'models')
 model_files = glob.glob(os.path.join(MODELS_DIR, '*.pm'))
 
-def train_model(dataset_path, design='2inv'):
+def train_model(dataset_path, design='2inv', inference_only=False):  # original: def train_model(dataset_path, design='2inv'):
     """Train the GAN on the given dataset, either via SLURM or locally."""
     dataset_name = os.path.splitext(os.path.basename(dataset_path))[0]
+    process_name = dataset_name[len('dataset_'):] if dataset_name.startswith('dataset_') else dataset_name
+    run_suffix = f"_{EFFECTIVE_RUN_TAG}" if EFFECTIVE_RUN_TAG else ""
+    mode_label = "inference-only" if inference_only else "training"
     project_root_local = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
     train_sbatch = os.path.join(project_root_local, 'scripts', 'train.sbatch')
     sweep_py = os.path.join(project_root_local, 'python', 'sweep.py')
 
     if args.no_slurm:
-        print(f"[NO-SLURM MODE] Running training locally: {sweep_py}")
+        print(f"[NO-SLURM MODE] Running {mode_label} locally: {sweep_py}")  # original: print(f"[NO-SLURM MODE] Running training locally: {sweep_py}")
         # Import sweep.py as a module and call main(config)
         import importlib.util
         import types
@@ -77,13 +81,17 @@ def train_model(dataset_path, design='2inv'):
         # Set DATASET and DESIGN environment variables for sweep.py
         os.environ['DATASET'] = dataset_name
         os.environ['DESIGN'] = design
-        os.environ['RUN_TAG'] = args.run_tag  # original: os.environ['DESIGN'] = design
+        os.environ['RUN_TAG'] = EFFECTIVE_RUN_TAG  # original: os.environ['RUN_TAG'] = args.run_tag  # original: os.environ['DESIGN'] = design
+        os.environ['INFERENCE_ONLY'] = '1' if inference_only else ''
         try:
             sweep.main(config)
         except Exception as e:
-            print(f"[ERROR] Local training failed: {e}", file=sys.stderr)
+            print(f"[ERROR] Local {mode_label} failed: {e}", file=sys.stderr)  # original: print(f"[ERROR] Local training failed: {e}", file=sys.stderr)
             sys.exit(1)
-        print(f"[NO-SLURM MODE] Training complete. Check results/model_*.pt for output.")
+        if inference_only:
+            print(f"[NO-SLURM MODE] Inference-only complete. Check privacy/predictions_{process_name}{run_suffix}.csv and privacy/inference_outputs_{process_name}{run_suffix}.npz.")  # original: print(f"[NO-SLURM MODE] Inference-only complete. Check results/predictions_{process_name}{run_suffix}.csv and results/inference_outputs_{process_name}{run_suffix}.npz.")
+        else:
+            print(f"[NO-SLURM MODE] Training complete. Check results/model_{process_name}{run_suffix}.pt for output.")
         return None
     else:
         # SLURM rejects scripts with DOS line endings. If the file was checked out
@@ -99,10 +107,10 @@ def train_model(dataset_path, design='2inv'):
 
         cmd = [
             'sbatch', '--parsable',
-            f'--export=DATASET={dataset_name},DESIGN={design},RUN_TAG={args.run_tag}',
+            f'--export=DATASET={dataset_name},DESIGN={design},RUN_TAG={EFFECTIVE_RUN_TAG},INFERENCE_ONLY={1 if inference_only else 0}',
             train_sbatch,
         ]
-        print(f"Submitting training job for dataset '{dataset_name}'...")
+        print(f"Submitting {mode_label} job for dataset '{dataset_name}'...")  # original: print(f"Submitting training job for dataset '{dataset_name}'...")
         result = subprocess.run(cmd, stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE, universal_newlines=True)
         if result.returncode != 0:
@@ -115,11 +123,15 @@ def train_model(dataset_path, design='2inv'):
             sys.exit(result.returncode)
         job_id = result.stdout.strip()
         print(f"\nTraining job submitted: job ID {job_id}")
+        if inference_only:
+            print("  Mode:          inference-only (reuses existing checkpoint)")
         print(f"  Monitor with:  squeue -j {job_id}")
         print(f"  Output log:    logs/slurm-{job_id}.out")
         print(f"  Error log:     logs/slurm-{job_id}.err")
-        process_name = dataset_name[len('dataset_'):] if dataset_name.startswith('dataset_') else dataset_name
-        print(f"  Checkpoint:    results/model_{process_name}.pt (when complete)\n")
+        print(f"  Checkpoint:    results/model_{process_name}{run_suffix}.pt (when complete)\n")  # original: print(f"  Checkpoint:    results/model_{process_name}.pt (when complete)\n")
+        if inference_only:
+            print(f"  Predictions:   privacy/predictions_{process_name}{run_suffix}.csv")  # original: print(f"  Predictions:   results/predictions_{process_name}{run_suffix}.csv")
+            print(f"  Inference NPZ: privacy/inference_outputs_{process_name}{run_suffix}.npz\n")  # original: print(f"  Inference NPZ: results/inference_outputs_{process_name}{run_suffix}.npz\n")
         return job_id
 
 def extract_nm(filename):
@@ -154,6 +166,27 @@ process_name = os.path.splitext(os.path.basename(selected_model))[0]
 dataset_name = f"dataset_{process_name}"
 design_name = '2inv'  # You can prompt for this or generalize later
 
+def _normalize_run_name(raw_name):
+    """Return (requested_name, effective_run_tag). baseline is an explicit run tag."""  # original: """Return (requested_name, effective_run_tag). baseline maps to default filenames."""
+    requested = (raw_name or '').strip()
+    if requested == '':
+        return 'baseline', 'baseline'  # original: return 'baseline', ''
+    safe = re.sub(r'[^A-Za-z0-9_-]+', '_', requested)
+    safe = re.sub(r'_+', '_', safe).strip('_')
+    if safe == '':
+        return 'baseline', 'baseline'  # original: return 'baseline', ''
+    if safe.lower() == 'baseline':
+        return 'baseline', 'baseline'
+    return safe, safe
+
+if args.run_tag.strip():
+    RUN_NAME, EFFECTIVE_RUN_TAG = _normalize_run_name(args.run_tag)
+    print(f"Using run name from --run-tag: {RUN_NAME}")
+else:
+    _user_run_name = input("Enter run name [baseline]: ").strip()
+    RUN_NAME, EFFECTIVE_RUN_TAG = _normalize_run_name(_user_run_name)
+    print(f"Using run name: {RUN_NAME}")
+
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 dataset_path = os.path.join(project_root, 'dataset', f'{dataset_name}.json')
 logs_dir = os.path.join(project_root, 'logs')
@@ -181,7 +214,21 @@ if os.path.exists(dataset_path):
     ).strip().lower()
     if resp == '' or resp.startswith('u'):
         print(f"\nUsing existing dataset: {dataset_path}.\nProceeding to training phase...\n")
-        train_model(dataset_path, design=design_name)
+        checkpoint_path = os.path.join(results_dir, f"model_{process_name}_{EFFECTIVE_RUN_TAG}.pt")
+        inference_only = False
+        if args.resume_inference_only:
+            inference_only = True
+        elif os.path.exists(checkpoint_path):
+            resume_resp = input(
+                f"Found existing checkpoint for this run name: {checkpoint_path}\n"
+                f"Resume inference/artifact export only (skip retraining)? [y/N]: "
+            ).strip().lower()
+            if resume_resp.startswith('y'):
+                inference_only = True
+        if inference_only and not os.path.exists(checkpoint_path):
+            print(f"ERROR: Inference-only requested but checkpoint not found: {checkpoint_path}", file=sys.stderr)
+            sys.exit(1)
+        train_model(dataset_path, design=design_name, inference_only=inference_only)
         sys.exit(0)
     else:
         try:

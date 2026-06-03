@@ -131,13 +131,21 @@ mkdir -p "$PROJECT_DIR/logs"
 	log "[preflight] DATASET='${DATASET:-<unset>}' DESIGN='${DESIGN:-<unset>}'"
 
 	log "About to run sweep.py: $PYTHON_BIN"
-	LAUNCH_CMD="import os, runpy, datetime; p='$PROJECT_DIR/python/sweep.py'; now=lambda: datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'); print(f'[{now()}] [launcher] python alive', flush=True); print(f'[{now()}] [launcher] sweep exists: {os.path.exists(p)}', flush=True); print(f'[{now()}] [launcher] import tracing enabled (-X importtime)', flush=True); runpy.run_path(p, run_name='__main__')"
+	LAUNCH_CMD="import os, runpy, datetime; p='$PROJECT_DIR/python/sweep.py'; now=lambda: datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'); print(f'[{now()}] [launcher] python alive', flush=True); print(f'[{now()}] [launcher] sweep exists: {os.path.exists(p)}', flush=True); runpy.run_path(p, run_name='__main__')"
+	PY_IMPORT_FLAGS=()
+	if [ "${IMPORT_TIME_TRACE:-0}" = "1" ]; then
+		PY_IMPORT_FLAGS=(-X importtime)
+		log "[launcher] import tracing enabled (-X importtime)"
+	fi
+	SWEEP_TIMEOUT_SECONDS="${SWEEP_TIMEOUT_SECONDS:-21600}"
 	if command -v timeout >/dev/null 2>&1; then
-		timeout 1800 "$PYTHON_BIN" -X importtime -u -c "$LAUNCH_CMD" 2>&1
+		set +e
+		timeout "$SWEEP_TIMEOUT_SECONDS" "$PYTHON_BIN" "${PY_IMPORT_FLAGS[@]}" -u -c "$LAUNCH_CMD" 2>&1
 		rc=$?
+		set -e
 		if [ "$rc" -ne 0 ]; then
 			if [ "$rc" -eq 124 ]; then
-				echo "[ERROR] sweep.py startup/run timed out after 1800s. Aborting early for diagnosis." >&2
+				echo "[ERROR] sweep.py startup/run timed out after ${SWEEP_TIMEOUT_SECONDS}s. Aborting early for diagnosis." >&2
 			else
 				echo "[ERROR] sweep.py failed with exit code $rc. See logs above." >&2
 			fi
@@ -145,7 +153,7 @@ mkdir -p "$PROJECT_DIR/logs"
 		fi
 	else
 		echo "[WARN] 'timeout' command not found; running sweep.py without startup watchdog" >&2
-		if ! "$PYTHON_BIN" -X importtime -u -c "$LAUNCH_CMD" 2>&1; then
+		if ! "$PYTHON_BIN" "${PY_IMPORT_FLAGS[@]}" -u -c "$LAUNCH_CMD" 2>&1; then
 			echo "[ERROR] sweep.py failed. See above for details." >&2
 			exit 1
 		fi

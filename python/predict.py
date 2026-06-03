@@ -16,6 +16,7 @@
 import argparse
 import json
 import os
+import pickle
 import numpy as np
 import pandas as pd
 import torch
@@ -36,7 +37,11 @@ CHECKPOINT_PATH = os.path.join(os.path.dirname(__file__), "..", "results", "mode
 
 def load_checkpoint(checkpoint_path, device):
 
-    checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=True)
+    try:
+        checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=True)
+    except pickle.UnpicklingError:
+        print("[predict] WARNING: weights-only checkpoint load failed; retrying with full trusted load.")
+        checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
     config = SimpleNamespace(**checkpoint["config"])
 
     gan = GAN(

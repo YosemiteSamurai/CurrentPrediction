@@ -8,7 +8,7 @@ from datetime import datetime
 
 USER = "jonesm25"
 EMAIL = "jonesm25@oregonstate.edu"
-CHECK_INTERVAL = 1800  # 30 minutes in seconds
+CHECK_INTERVAL = 900  # 15 minutes in seconds
 LOGS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'logs'))
 
 def filter_squeue_output(squeue_output):
