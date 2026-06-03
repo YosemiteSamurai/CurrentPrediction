@@ -18,6 +18,35 @@
 
 set -euo pipefail
 
+TOKEN="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
+
+build_auth_url() {
+  local url="$1"
+
+  # Convert HTTPS GitHub remote to token-authenticated URL when a token exists.
+  # Example:
+  #   https://github.com/owner/repo.git
+  # ->
+  #   https://x-access-token:<token>@github.com/owner/repo.git
+  if [[ -n "$TOKEN" && "$url" =~ ^https://github\.com/(.+)$ ]]; then
+    printf 'https://x-access-token:%s@github.com/%s' "$TOKEN" "${BASH_REMATCH[1]}"
+    return 0
+  fi
+
+  # Convert SSH GitHub remote to token-authenticated HTTPS URL when token exists.
+  # Example:
+  #   git@github.com:owner/repo.git
+  # ->
+  #   https://x-access-token:<token>@github.com/owner/repo.git
+  if [[ -n "$TOKEN" && "$url" =~ ^git@github\.com:(.+)$ ]]; then
+    printf 'https://x-access-token:%s@github.com/%s' "$TOKEN" "${BASH_REMATCH[1]}"
+    return 0
+  fi
+
+  # Keep SSH remotes and all non-GitHub URLs unchanged.
+  printf '%s' "$url"
+}
+
 if [[ $# -lt 1 ]]; then
   echo "Usage: $0 <new_tag> [commit message]"
   exit 1
@@ -26,6 +55,13 @@ fi
 TAG="$1"
 shift
 MSG="${*:-}"
+ORIGIN_URL="$(git remote get-url origin)"
+AUTH_PUSH_URL="$(build_auth_url "$ORIGIN_URL")"
+
+# Disable interactive credential prompts when a token is provided.
+if [[ -n "$TOKEN" ]]; then
+  export GIT_TERMINAL_PROMPT=0
+fi
 
 # Sanity: must be inside a git repo.
 git rev-parse --show-toplevel >/dev/null
@@ -35,7 +71,7 @@ if git rev-parse "$TAG" >/dev/null 2>&1; then
   echo "ERROR: Tag '$TAG' already exists locally."
   exit 1
 fi
-if git ls-remote --tags origin "refs/tags/$TAG" | grep -q .; then
+if git ls-remote --tags "$AUTH_PUSH_URL" "refs/tags/$TAG" | grep -q .; then
   echo "ERROR: Tag '$TAG' already exists on origin."
   exit 1
 fi
@@ -72,15 +108,15 @@ git tag -a "$TAG" -m "$TAG"
 
 echo
 echo "==> Pushing branch $BRANCH"
-git push origin "$BRANCH"
+git push "$AUTH_PUSH_URL" "$BRANCH"
 
 echo
 echo "==> Pushing tag $TAG"
-git push origin "$TAG"
+git push "$AUTH_PUSH_URL" "$TAG"
 
 echo
 echo "==> Done."
 git log --oneline -3
 echo
 echo "Remote refs:"
-git ls-remote origin "refs/heads/$BRANCH" "refs/tags/$TAG"
+git ls-remote "$AUTH_PUSH_URL" "refs/heads/$BRANCH" "refs/tags/$TAG"
