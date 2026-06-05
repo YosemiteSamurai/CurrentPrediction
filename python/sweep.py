@@ -16,6 +16,7 @@ import sys
 import argparse
 import random
 import time
+import subprocess
 
 print("[sweep] module loaded", flush=True)
 
@@ -103,8 +104,10 @@ def run_inference_and_copy(process_name, run_suffix, dataset_path, model_path, m
         "--output", output_csv,
         "--checkpoint", model_path
     ]
+    inference_started = time.perf_counter()
     print(f"\nRunning inference for privacy outputs...\n{' '.join(predict_cmd)}", flush=True)
     subprocess.run(predict_cmd, check=True)
+    inference_seconds = time.perf_counter() - inference_started
 
     # Keep only one copy of non-model artifacts in privacy/.
     import shutil
@@ -131,6 +134,85 @@ def run_inference_and_copy(process_name, run_suffix, dataset_path, model_path, m
     else:
         print(f"[sweep] WARNING: metadata not found at {metadata_path}; skipping metadata copy")
 
+    run_tag = run_suffix.lstrip('_') or 'baseline'
+    process_with_tag = f"{process_name}_{run_tag}"
+    privacy_attack_py = os.path.join(os.path.dirname(__file__), '..', 'privacy', 'privacy_attack.py')
+    attack_cmd = [
+        sys.executable,
+        privacy_attack_py,
+        '--process', process_name,
+        '--run-tag', run_tag,
+        '--privacy_dir', privacy_dir,
+    ]
+    attacks_started = time.perf_counter()
+    print(f"\n[sweep] Running privacy attacks...\n{' '.join(attack_cmd)}", flush=True)
+    subprocess.run(attack_cmd, check=True)
+    attacks_seconds = time.perf_counter() - attacks_started
+
+    expected = [
+        f"embedding_inversion_{process_with_tag}.npz",
+        f"edge_reconstruction_{process_with_tag}.npz",
+        f"membership_inference_{process_with_tag}.npz",
+    ]
+    for name in expected:
+        path = os.path.join(privacy_dir, name)
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"[sweep] expected privacy artifact missing: {path}")
+
+    return {
+        "inference_seconds": inference_seconds,
+        "attacks_seconds": attacks_seconds,
+        "post_training_seconds": inference_seconds + attacks_seconds,
+    }
+
+def run_split_backend(privacy_mode):
+    """Dispatch training to privacy/split backend for SL-based modes."""
+    split_sweep = os.path.join(os.path.dirname(__file__), '..', 'privacy', 'split', 'sweep.py')
+    split_cwd = os.path.dirname(split_sweep)
+    env = os.environ.copy()
+    env['PRIVACY_MODE'] = privacy_mode
+    # Force split mode in split backend for sl/both.
+    env['SPLIT_LEARNING'] = '1'
+    cmd = [sys.executable, split_sweep]
+    print(f"[sweep] delegating to split backend: {' '.join(cmd)}", flush=True)
+    subprocess.run(cmd, cwd=split_cwd, env=env, check=True)
+
+def train_with_dp(gcn, optimizer, trainloader, config, device, noise_multiplier, max_grad_norm):
+    """DP-style training: per-batch clip + Gaussian noise (practical approximation)."""
+    from graph import batch_graph
+    import torch
+
+    criterion = torch.nn.L1Loss()
+    total_loss = 0.0
+    batches = 0
+
+    for batch in trainloader:
+        graph = batch_graph(batch, config)
+        A = graph.A.to(device)
+        y = graph.y.to(device)
+        X = graph.X.to(device)
+
+        optimizer.zero_grad()
+        z = gcn.encode(X, A)
+        out = gcn.decode(z, A).view(-1)
+        n_edges = y.shape[0]
+        mask = torch.zeros(n_edges, dtype=torch.bool, device=device)
+        mask[config.target_edge_idx::config.edges_per_graph] = True
+        loss = criterion(out[mask], y[mask])
+        loss.backward()
+
+        torch.nn.utils.clip_grad_norm_(gcn.parameters(), max_grad_norm)
+        if noise_multiplier > 0:
+            for p in gcn.parameters():
+                if p.grad is not None:
+                    p.grad.add_(torch.randn_like(p.grad) * (noise_multiplier * max_grad_norm))
+
+        optimizer.step()
+        total_loss += loss.item()
+        batches += 1
+
+    return gcn, optimizer, (total_loss / max(batches, 1))
+
 def main(config):
 
     print("[sweep] importing torch...", flush=True)
@@ -152,6 +234,10 @@ def main(config):
 
     run_tag = config.run_tag or os.environ.get('RUN_TAG', '').strip()
     run_suffix = f"_{run_tag}" if run_tag else ""
+    privacy_mode = os.environ.get('PRIVACY_MODE', 'neither').strip().lower() or 'neither'
+    if privacy_mode not in {'neither', 'dp', 'sl', 'both'}:
+        raise ValueError(f"[sweep] Invalid PRIVACY_MODE='{privacy_mode}'. Use neither|dp|sl|both")
+    print(f"[sweep] PRIVACY_MODE: {privacy_mode}", flush=True)
 
     # Determine process name and artifact paths for output naming
     dataset_path = os.environ.get('DATASET_PATH', '')
@@ -168,12 +254,18 @@ def main(config):
 
     inference_only = os.environ.get('INFERENCE_ONLY', '').strip().lower() in {'1', 'true', 'yes'}
     if inference_only:
+        if privacy_mode in {'sl', 'both'}:
+            raise ValueError("[sweep] INFERENCE_ONLY is currently only supported for monolithic modes (neither/dp)")
         print(f"[sweep] INFERENCE_ONLY=1: skipping training and reusing checkpoint {model_path}", flush=True)
         if not os.path.exists(model_path):
             raise FileNotFoundError(f"[sweep] INFERENCE_ONLY requested but checkpoint not found: {model_path}")
         if not dataset_path:
             raise ValueError("[sweep] INFERENCE_ONLY requested but DATASET_PATH is empty")
         run_inference_and_copy(process_name, run_suffix, dataset_path, model_path, metadata_path)
+        return
+
+    if privacy_mode in {'sl', 'both'}:
+        run_split_backend(privacy_mode)
         return
 
     run = wandb.init(
@@ -184,10 +276,13 @@ def main(config):
 
     )
 
-    run.name = f"{config.hidden_dim}-width, {2 + config.layers}-layer, {config.heads}-heads"
+    run_name = f"{process_name}_{run_tag}" if run_tag else process_name
+    run.name = run_name  # original: run.name = f"{config.hidden_dim}-width, {2 + config.layers}-layer, {config.heads}-heads"
     print(f"Starting run: {run.name}", flush=True)
     print(f"Device: {device}", flush=True)
 
+
+    data_prep_started = time.perf_counter()
 
     split_df = data_frame.copy()
     if row_ids is not None:
@@ -213,6 +308,7 @@ def main(config):
 
     train_dataset = circuit_dataset(train_df, config)
     test_dataset = circuit_dataset(test_df, config)
+    data_prep_seconds = time.perf_counter() - data_prep_started
     print(f"[sweep] datasets created: {len(train_dataset)} train, {len(test_dataset)} test", flush=True)
 
     trainloader = DataLoader(
@@ -237,11 +333,20 @@ def main(config):
 
     training_started = time.perf_counter()
     epoch_times = []
+    dp_noise_multiplier = float(os.environ.get('DP_NOISE_MULTIPLIER', '0.6'))
+    dp_max_grad_norm = float(os.environ.get('DP_MAX_GRAD_NORM', '1.0'))
 
     for epoch in range(config.epochs):
         epoch_started = time.perf_counter()
 
-        gcn, optimizer, trainloss = train(gcn, optimizer, trainloader, config)
+        if privacy_mode == 'dp':
+            gcn, optimizer, trainloss = train_with_dp(
+                gcn, optimizer, trainloader, config, device,
+                noise_multiplier=dp_noise_multiplier,
+                max_grad_norm=dp_max_grad_norm,
+            )
+        else:
+            gcn, optimizer, trainloss = train(gcn, optimizer, trainloader, config)
         testloss, testMRE, maxRE, minRE = test(gcn, testloader, config)
         scheduler.step(testloss)
         current_lr = optimizer.param_groups[0]['lr']
@@ -263,6 +368,9 @@ def main(config):
         print(f"LR: {current_lr}", flush=True)
         print(f"Epoch time: {epoch_seconds:.2f}s", flush=True)
         epoch_times.append(epoch_seconds)
+
+    training_seconds = time.perf_counter() - training_started
+    checkpoint_started = time.perf_counter()
 
     results_dir = os.path.join(os.path.dirname(__file__), "..", "results")  # original: results_dir = os.path.join(os.path.dirname(__file__), "..", "results")
     os.makedirs(results_dir, exist_ok=True)  # original: os.makedirs(results_dir, exist_ok=True)
@@ -286,6 +394,7 @@ def main(config):
     model_path = os.path.join(results_dir, f"model_{process_name}{run_suffix}.pt")  # original: model_path = os.path.join(results_dir, f"model_{process_name}{run_suffix}.pt")
     torch.save(checkpoint, model_path)
     print(f"Model saved to {model_path}", flush=True)
+    checkpoint_seconds = time.perf_counter() - checkpoint_started
 
     load_time_seconds = globals().get('DATASET_LOAD_SECONDS')
     if load_time_seconds is None:
@@ -294,23 +403,39 @@ def main(config):
         "process_name": process_name,
         "dataset_path": dataset_path,
         "run_tag": run_tag,
+        "privacy_mode": privacy_mode,
         "dataset_load_seconds": load_time_seconds,
-        "training_seconds": time.perf_counter() - training_started,
+        "data_prep_seconds": data_prep_seconds,
+        "training_seconds": training_seconds,
         "epoch_seconds": epoch_times,
+        "checkpoint_seconds": checkpoint_seconds,
         "epochs": config.epochs,
         "test_size": config.test_size,
         "batch_size": config.batch_size,
+        "train_samples": len(train_dataset),
+        "test_samples": len(test_dataset),
+        "training_samples_per_second": (len(train_dataset) * config.epochs) / max(training_seconds, 1e-12),
         "hidden_dim": config.hidden_dim,
         "layers": config.layers,
         "heads": config.heads,
     }
+    if privacy_mode == 'dp':
+        metadata["dp_noise_multiplier"] = dp_noise_multiplier
+        metadata["dp_max_grad_norm"] = dp_max_grad_norm
     metadata_path = os.path.join(privacy_dir, f"run_metadata_{process_name}{run_suffix}.json")  # original: metadata_path = os.path.join(results_dir, f"run_metadata_{process_name}{run_suffix}.json")  # original: metadata_path = os.path.join(results_dir, f"run_metadata_{process_name}{run_suffix}.json")
+    post_training_times = run_inference_and_copy(process_name, run_suffix, dataset_path, model_path, metadata_path)
+    metadata.update(post_training_times)
+    metadata["end_to_end_seconds"] = (
+        metadata["data_prep_seconds"]
+        + metadata["training_seconds"]
+        + metadata["checkpoint_seconds"]
+        + metadata["post_training_seconds"]
+    )
+
     with open(metadata_path, 'w') as metadata_file:
         json.dump(metadata, metadata_file, indent=2)
     print(f"[sweep] Saved run metadata to {metadata_path}", flush=True)
-
-    run_inference_and_copy(process_name, run_suffix, dataset_path, model_path, metadata_path)
-    print(f"[sweep] total training time: {time.perf_counter() - training_started:.2f}s", flush=True)
+    print(f"[sweep] total end-to-end time: {metadata['end_to_end_seconds']:.2f}s", flush=True)
     run.finish()
 
 if __name__ == '__main__':

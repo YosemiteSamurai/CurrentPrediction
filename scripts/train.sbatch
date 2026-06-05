@@ -118,8 +118,18 @@ mkdir -p "$PROJECT_DIR/logs"
 	log "Hello world test finished: $?"
 
 	log "Running lightweight preflight (paths and inputs)"
+	PRIVACY_MODE="${PRIVACY_MODE:-neither}"
+	SWEEP_SCRIPT="$PROJECT_DIR/python/sweep.py"
+	if [ "$PRIVACY_MODE" = "sl" ] || [ "$PRIVACY_MODE" = "both" ]; then
+		SWEEP_SCRIPT="$PROJECT_DIR/privacy/split/sweep.py"
+		export SPLIT_LEARNING=1
+	fi
 	if [ ! -f "$PROJECT_DIR/python/sweep.py" ]; then
 		echo "[ERROR] Missing sweep.py at $PROJECT_DIR/python/sweep.py" >&2
+		exit 4
+	fi
+	if [ ! -f "$SWEEP_SCRIPT" ]; then
+		echo "[ERROR] Missing selected sweep script at $SWEEP_SCRIPT" >&2
 		exit 4
 	fi
 	if [ ! -d "$PROJECT_DIR/dataset" ]; then
@@ -129,9 +139,11 @@ mkdir -p "$PROJECT_DIR/logs"
 	log "[preflight] sweep.py found"
 	log "[preflight] dataset dir found"
 	log "[preflight] DATASET='${DATASET:-<unset>}' DESIGN='${DESIGN:-<unset>}'"
+	log "[preflight] PRIVACY_MODE='${PRIVACY_MODE}'"
+	log "[preflight] SWEEP_SCRIPT='${SWEEP_SCRIPT}'"
 
 	log "About to run sweep.py: $PYTHON_BIN"
-	LAUNCH_CMD="import os, runpy, datetime; p='$PROJECT_DIR/python/sweep.py'; now=lambda: datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'); print(f'[{now()}] [launcher] python alive', flush=True); print(f'[{now()}] [launcher] sweep exists: {os.path.exists(p)}', flush=True); runpy.run_path(p, run_name='__main__')"
+	LAUNCH_CMD="import os, runpy, datetime; p='$SWEEP_SCRIPT'; now=lambda: datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'); print(f'[{now()}] [launcher] python alive', flush=True); print(f'[{now()}] [launcher] sweep exists: {os.path.exists(p)}', flush=True); runpy.run_path(p, run_name='__main__')"
 	PY_IMPORT_FLAGS=()
 	if [ "${IMPORT_TIME_TRACE:-0}" = "1" ]; then
 		PY_IMPORT_FLAGS=(-X importtime)

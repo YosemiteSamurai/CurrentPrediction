@@ -1,0 +1,825 @@
+[2026-06-04 18:01:18] Job ID: 20441605
+[2026-06-04 18:01:18] Node:   cn-r-5
+[2026-06-04 18:01:18] Start:  Thu Jun  4 06:01:18 PM PDT 2026
+[2026-06-04 18:01:18] Current working directory: /nfs/stak/users/jonesm25/CurrentPrediction/python
+[2026-06-04 18:01:18] User: jonesm25
+[2026-06-04 18:01:18] Hostname: cn-r-5.hpc.engr.oregonstate.edu
+[2026-06-04 18:01:18] PATH: /cm/local/apps/environment-modules/4.5.3//bin:/apps/slurm/bin:/apps/slurm/current/bin:/opt/TurboVNC/bin:/nfs/stak/users/jonesm25/perl5/bin:/cm/local/apps/environment-modules/4.5.3/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/sbin:/sbin:/usr/sbin:/cm/local/apps/environment-modules/4.5.3/bin
+[2026-06-04 18:01:18] Conda base: conda not found
+[2026-06-04 18:01:18] Using fallback python: /nfs/stak/users/renya/jonesm25/.conda/envs/currentprediction/bin/python
+[2026-06-04 18:01:18] Thread env: OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1
+[2026-06-04 18:01:18] About to run hello world test: /nfs/stak/users/renya/jonesm25/.conda/envs/currentprediction/bin/python
+Hello world from SLURM batch!
+[2026-06-04 18:01:18] Hello world test finished: 0
+[2026-06-04 18:01:18] Running lightweight preflight (paths and inputs)
+[2026-06-04 18:01:18] [preflight] sweep.py found
+[2026-06-04 18:01:18] [preflight] dataset dir found
+[2026-06-04 18:01:18] [preflight] DATASET='dataset_22nm_LP' DESIGN='2inv'
+[2026-06-04 18:01:18] [preflight] PRIVACY_MODE='both'
+[2026-06-04 18:01:18] [preflight] SWEEP_SCRIPT='/nfs/stak/users/jonesm25/CurrentPrediction/privacy/split/sweep.py'
+[2026-06-04 18:01:18] About to run sweep.py: /nfs/stak/users/renya/jonesm25/.conda/envs/currentprediction/bin/python
+[2026-06-04 18:01:18] [launcher] python alive
+[2026-06-04 18:01:18] [launcher] sweep exists: True
+[dataset] imports complete
+[dataset] using DATASET: /nfs/stak/users/jonesm25/CurrentPrediction/dataset/dataset_22nm_LP.json
+[dataset] loading JSON...
+[dataset] loaded 100000 rows
+[dataset] normalizing labels...
+[dataset] 1 unique process(es): ['22nm_LP']
+===================Data loaded successfully===============
+head
+   Size  Option       WN1       WP1  ...     SkewL     SkewR  Design  _process
+0   0.0     0.0 -1.100689 -0.919121  ... -1.118034 -1.118034    2inv   22nm_LP
+1   0.0     0.0  0.152634  1.208885  ... -1.118034 -1.118034    2inv   22nm_LP
+2   0.0     0.0  1.267764  0.784693  ... -1.118034 -1.118034    2inv   22nm_LP
+3   0.0     0.0 -1.715803  0.591564  ... -1.118034 -1.118034    2inv   22nm_LP
+4   0.0     0.0 -0.991644  1.602858  ... -1.118034 -1.118034    2inv   22nm_LP
+
+[5 rows x 24 columns]
+infomation
+<class 'pandas.DataFrame'>
+RangeIndex: 100000 entries, 0 to 99999
+Data columns (total 24 columns):
+ #   Column    Non-Null Count   Dtype  
+---  ------    --------------   -----  
+ 0   Size      100000 non-null  float64
+ 1   Option    100000 non-null  float64
+ 2   WN1       100000 non-null  float64
+ 3   WP1       100000 non-null  float64
+ 4   WN2       100000 non-null  float64
+ 5   WP2       100000 non-null  float64
+ 6   L1        100000 non-null  float64
+ 7   L2        100000 non-null  float64
+ 8   VDD       100000 non-null  float64
+ 9   Temp      100000 non-null  float64
+ 10  V_vdd     100000 non-null  float64
+ 11  V_gnd     100000 non-null  float64
+ 12  V_in      100000 non-null  float64
+ 13  V_out     100000 non-null  float64
+ 14  V_target  100000 non-null  float64
+ 15  I_vdd     100000 non-null  float64
+ 16  I_gnd     100000 non-null  float64
+ 17  I_in      100000 non-null  float64
+ 18  I_out     100000 non-null  float64
+ 19  I_target  100000 non-null  float64
+ 20  SkewL     100000 non-null  float64
+ 21  SkewR     100000 non-null  float64
+ 22  Design    100000 non-null  str    
+ 23  _process  100000 non-null  str    
+dtypes: float64(22), str(2)
+memory usage: 18.3 MB
+None
+size of DF
+(100000, 24)
+[dataset] PUBLIC_FEATURE_COLS  (17): ['Size', 'Option', 'WN1', 'WP1', 'WN2', 'WP2', 'L1', 'L2', 'VDD', 'Temp', 'V_vdd', 'V_gnd', 'V_in', 'V_out', 'V_target', 'SkewL', 'SkewR']
+[dataset] PRIVATE_FEATURE_COLS (0): []
+[dataset] device: cuda:0
+[sweep] base imports done
+[sweep] dataset imported
+[sweep] GAN imported
+[sweep] PRIVACY_MODE=both: enabling split-learning + DP (sigma=0.6, C=1.0)
+wandb: [wandb.login()] Loaded credentials for https://api.wandb.ai from /nfs/stak/users/jonesm25/.netrc.
+wandb: Currently logged in as: jonesm25 (yosemitesamurai) to https://api.wandb.ai. Use `wandb login --relogin` to force relogin
+wandb: setting up run 51h8hu5f
+wandb: Tracking run with wandb version 0.27.0
+wandb: Run data is saved locally in /nfs/stak/users/jonesm25/CurrentPrediction/python/wandb/run-20260604_180132-51h8hu5f
+wandb: Run `wandb offline` to turn off syncing.
+wandb: Syncing run spring-field-33
+wandb: ⭐️ View project at https://wandb.ai/yosemitesamurai/CurrentPrediction
+wandb: 🚀 View run at https://wandb.ai/yosemitesamurai/CurrentPrediction/runs/51h8hu5f
+Starting run: 22nm_LP_both
+Device: cuda:0
+split_learning: True
+[sweep] Saved training IDs to /nfs/stak/users/jonesm25/CurrentPrediction/privacy/train_ids_22nm_LP_both.npy
+[sweep] datasets created: 70000 train, 30000 test
+[sweep] node feature dim: 41
+[sweep] model initialized, starting training...
+[sweep] foundry initialised: 1 process(es), embed_dim=16
+Finished Epoch 1
+Training Loss: 1.6256349220245367
+Avg Test Loss 1.4387966137705073
+Mean Relative Error (I_target): 3190.05517578125
+LR: 0.0001
+Epoch time: 57.39s
+Finished Epoch 2
+Training Loss: 1.2054005932110536
+Avg Test Loss 0.9258368899191874
+Mean Relative Error (I_target): 333.9695739746094
+LR: 0.0001
+Epoch time: 56.78s
+Finished Epoch 3
+Training Loss: 0.5881988895032044
+Avg Test Loss 0.3330947072235252
+Mean Relative Error (I_target): 9.592763900756836
+LR: 0.0001
+Epoch time: 55.81s
+Finished Epoch 4
+Training Loss: 0.3237168484621118
+Avg Test Loss 0.31982219003156814
+Mean Relative Error (I_target): 5.632075309753418
+LR: 0.0001
+Epoch time: 56.85s
+Finished Epoch 5
+Training Loss: 0.32259124263412775
+Avg Test Loss 0.31982207384063743
+Mean Relative Error (I_target): 5.59048318862915
+LR: 0.0001
+Epoch time: 50.68s
+Finished Epoch 6
+Training Loss: 0.3226612693608025
+Avg Test Loss 0.31979757010428383
+Mean Relative Error (I_target): 5.736743450164795
+LR: 0.0001
+Epoch time: 50.51s
+Finished Epoch 7
+Training Loss: 0.3226459041591972
+Avg Test Loss 0.3198078749085794
+Mean Relative Error (I_target): 5.8265299797058105
+LR: 0.0001
+Epoch time: 51.00s
+Finished Epoch 8
+Training Loss: 0.32261424163659486
+Avg Test Loss 0.3198145059888551
+Mean Relative Error (I_target): 5.866508960723877
+LR: 0.0001
+Epoch time: 50.73s
+Finished Epoch 9
+Training Loss: 0.32255503079654746
+Avg Test Loss 0.3197789146130019
+Mean Relative Error (I_target): 5.593858242034912
+LR: 0.0001
+Epoch time: 50.60s
+Finished Epoch 10
+Training Loss: 0.3225399863376696
+Avg Test Loss 0.3197407289418076
+Mean Relative Error (I_target): 5.601489543914795
+LR: 0.0001
+Epoch time: 50.74s
+Finished Epoch 11
+Training Loss: 0.32245651319268853
+Avg Test Loss 0.3196038916738811
+Mean Relative Error (I_target): 5.803696155548096
+LR: 0.0001
+Epoch time: 51.12s
+Finished Epoch 12
+Training Loss: 0.3224702478749116
+Avg Test Loss 0.31964035198759677
+Mean Relative Error (I_target): 5.70965576171875
+LR: 0.0001
+Epoch time: 51.83s
+Finished Epoch 13
+Training Loss: 0.3224887550081479
+Avg Test Loss 0.31963584327430866
+Mean Relative Error (I_target): 5.839901924133301
+LR: 0.0001
+Epoch time: 51.75s
+Finished Epoch 14
+Training Loss: 0.3225058275096159
+Avg Test Loss 0.3196716407564149
+Mean Relative Error (I_target): 5.679111957550049
+LR: 0.0001
+Epoch time: 51.51s
+Finished Epoch 15
+Training Loss: 0.3224855782344965
+Avg Test Loss 0.3196844311315876
+Mean Relative Error (I_target): 5.597550868988037
+LR: 0.0001
+Epoch time: 50.21s
+Finished Epoch 16
+Training Loss: 0.3224517850705867
+Avg Test Loss 0.319800864913062
+Mean Relative Error (I_target): 5.4817914962768555
+LR: 0.0001
+Epoch time: 49.33s
+Finished Epoch 17
+Training Loss: 0.32246209847888957
+Avg Test Loss 0.3197228227025156
+Mean Relative Error (I_target): 5.540185451507568
+LR: 0.0001
+Epoch time: 48.13s
+Finished Epoch 18
+Training Loss: 0.32250651469287317
+Avg Test Loss 0.3197226679242496
+Mean Relative Error (I_target): 5.505918979644775
+LR: 0.0001
+Epoch time: 48.22s
+Finished Epoch 19
+Training Loss: 0.322441663089084
+Avg Test Loss 0.3196219958063128
+Mean Relative Error (I_target): 5.682792663574219
+LR: 0.0001
+Epoch time: 48.61s
+Finished Epoch 20
+Training Loss: 0.3224081072404681
+Avg Test Loss 0.31964573465875473
+Mean Relative Error (I_target): 5.514097690582275
+LR: 5e-05
+Epoch time: 48.78s
+Finished Epoch 21
+Training Loss: 0.3223529652142438
+Avg Test Loss 0.319549286972358
+Mean Relative Error (I_target): 5.6931538581848145
+LR: 5e-05
+Epoch time: 48.88s
+Finished Epoch 22
+Training Loss: 0.32232923708324895
+Avg Test Loss 0.3195044648513865
+Mean Relative Error (I_target): 5.704024314880371
+LR: 5e-05
+Epoch time: 48.90s
+Finished Epoch 23
+Training Loss: 0.3223240937649441
+Avg Test Loss 0.319492849570983
+Mean Relative Error (I_target): 5.6340651512146
+LR: 5e-05
+Epoch time: 48.54s
+Finished Epoch 24
+Training Loss: 0.322300685620722
+Avg Test Loss 0.3195311671285741
+Mean Relative Error (I_target): 5.761152267456055
+LR: 5e-05
+Epoch time: 48.58s
+Finished Epoch 25
+Training Loss: 0.3223043640009664
+Avg Test Loss 0.3195249786985708
+Mean Relative Error (I_target): 5.695102691650391
+LR: 5e-05
+Epoch time: 47.70s
+Finished Epoch 26
+Training Loss: 0.32230380237429407
+Avg Test Loss 0.3195270750758999
+Mean Relative Error (I_target): 5.789836883544922
+LR: 5e-05
+Epoch time: 48.00s
+Finished Epoch 27
+Training Loss: 0.3223323554985593
+Avg Test Loss 0.319581524522574
+Mean Relative Error (I_target): 5.818565845489502
+LR: 5e-05
+Epoch time: 45.67s
+Finished Epoch 28
+Training Loss: 0.3223647686092684
+Avg Test Loss 0.3195619133712132
+Mean Relative Error (I_target): 5.69539213180542
+LR: 5e-05
+Epoch time: 45.59s
+Finished Epoch 29
+Training Loss: 0.32238333941977027
+Avg Test Loss 0.3195770937464893
+Mean Relative Error (I_target): 5.671619892120361
+LR: 5e-05
+Epoch time: 45.95s
+Finished Epoch 30
+Training Loss: 0.32233828868056347
+Avg Test Loss 0.3195824584345828
+Mean Relative Error (I_target): 5.562760353088379
+LR: 5e-05
+Epoch time: 45.78s
+Finished Epoch 31
+Training Loss: 0.3223070588909512
+Avg Test Loss 0.31952036655088983
+Mean Relative Error (I_target): 5.838160037994385
+LR: 2.5e-05
+Epoch time: 45.66s
+Finished Epoch 32
+Training Loss: 0.3222884763597461
+Avg Test Loss 0.3194886290633094
+Mean Relative Error (I_target): 5.6713948249816895
+LR: 2.5e-05
+Epoch time: 45.55s
+Finished Epoch 33
+Training Loss: 0.32228013913281656
+Avg Test Loss 0.31948473382352005
+Mean Relative Error (I_target): 5.65449333190918
+LR: 2.5e-05
+Epoch time: 45.74s
+Finished Epoch 34
+Training Loss: 0.32226742661713026
+Avg Test Loss 0.3194714192070687
+Mean Relative Error (I_target): 5.672263145446777
+LR: 2.5e-05
+Epoch time: 45.87s
+Finished Epoch 35
+Training Loss: 0.32227531683646565
+Avg Test Loss 0.3194828159265172
+Mean Relative Error (I_target): 5.70819091796875
+LR: 2.5e-05
+Epoch time: 45.79s
+Finished Epoch 36
+Training Loss: 0.3222535842079567
+Avg Test Loss 0.3194707599021733
+Mean Relative Error (I_target): 5.657702445983887
+LR: 2.5e-05
+Epoch time: 45.75s
+Finished Epoch 37
+Training Loss: 0.3222495363497429
+Avg Test Loss 0.3194734413327693
+Mean Relative Error (I_target): 5.698562145233154
+LR: 2.5e-05
+Epoch time: 45.85s
+Finished Epoch 38
+Training Loss: 0.3222484677839323
+Avg Test Loss 0.31947210426333106
+Mean Relative Error (I_target): 5.672669887542725
+LR: 2.5e-05
+Epoch time: 45.85s
+Finished Epoch 39
+Training Loss: 0.3222655240153482
+Avg Test Loss 0.31945125077134257
+Mean Relative Error (I_target): 5.720154285430908
+LR: 2.5e-05
+Epoch time: 45.61s
+Finished Epoch 40
+Training Loss: 0.3222333760336178
+Avg Test Loss 0.319436557845139
+Mean Relative Error (I_target): 5.663186073303223
+LR: 2.5e-05
+Epoch time: 45.65s
+Finished Epoch 41
+Training Loss: 0.3222039663173272
+Avg Test Loss 0.31942828998827477
+Mean Relative Error (I_target): 5.67995023727417
+LR: 2.5e-05
+Epoch time: 45.69s
+Finished Epoch 42
+Training Loss: 0.32221199132134315
+Avg Test Loss 0.3194248110754912
+Mean Relative Error (I_target): 5.714465618133545
+LR: 2.5e-05
+Epoch time: 46.08s
+Finished Epoch 43
+Training Loss: 0.32222630925326723
+Avg Test Loss 0.31946939892415555
+Mean Relative Error (I_target): 5.543857574462891
+LR: 2.5e-05
+Epoch time: 45.95s
+Finished Epoch 44
+Training Loss: 0.3222287010939509
+Avg Test Loss 0.3194568716704464
+Mean Relative Error (I_target): 5.592870712280273
+LR: 2.5e-05
+Epoch time: 45.85s
+Finished Epoch 45
+Training Loss: 0.3222399899426173
+Avg Test Loss 0.31944081374704203
+Mean Relative Error (I_target): 5.645315170288086
+LR: 2.5e-05
+Epoch time: 45.83s
+Finished Epoch 46
+Training Loss: 0.32223318061592154
+Avg Test Loss 0.31943450334356793
+Mean Relative Error (I_target): 5.717347621917725
+LR: 2.5e-05
+Epoch time: 45.84s
+Finished Epoch 47
+Training Loss: 0.3222472071715748
+Avg Test Loss 0.3194501730265902
+Mean Relative Error (I_target): 5.612617015838623
+LR: 2.5e-05
+Epoch time: 46.01s
+Finished Epoch 48
+Training Loss: 0.32224154152943185
+Avg Test Loss 0.3194405362010002
+Mean Relative Error (I_target): 5.649312496185303
+LR: 2.5e-05
+Epoch time: 45.62s
+Finished Epoch 49
+Training Loss: 0.32221900548452215
+Avg Test Loss 0.31944869692201044
+Mean Relative Error (I_target): 5.577415943145752
+LR: 1.25e-05
+Epoch time: 45.75s
+Finished Epoch 50
+Training Loss: 0.32222776958749544
+Avg Test Loss 0.31943519983782187
+Mean Relative Error (I_target): 5.590481758117676
+LR: 1.25e-05
+Epoch time: 45.68s
+Finished Epoch 51
+Training Loss: 0.3222127299912451
+Avg Test Loss 0.3194104345209563
+Mean Relative Error (I_target): 5.6468048095703125
+LR: 1.25e-05
+Epoch time: 45.43s
+Finished Epoch 52
+Training Loss: 0.32219568253162795
+Avg Test Loss 0.3193958469831359
+Mean Relative Error (I_target): 5.684361934661865
+LR: 1.25e-05
+Epoch time: 45.57s
+Finished Epoch 53
+Training Loss: 0.3221798483725004
+Avg Test Loss 0.31939317986591537
+Mean Relative Error (I_target): 5.644448280334473
+LR: 1.25e-05
+Epoch time: 45.28s
+Finished Epoch 54
+Training Loss: 0.3221501358588936
+Avg Test Loss 0.3193798632954738
+Mean Relative Error (I_target): 5.675856590270996
+LR: 1.25e-05
+Epoch time: 45.82s
+Finished Epoch 55
+Training Loss: 0.3221745709233136
+Avg Test Loss 0.31936931015967307
+Mean Relative Error (I_target): 5.676955223083496
+LR: 1.25e-05
+Epoch time: 45.44s
+Finished Epoch 56
+Training Loss: 0.32218888661461514
+Avg Test Loss 0.3193640142742759
+Mean Relative Error (I_target): 5.656618118286133
+LR: 1.25e-05
+Epoch time: 45.77s
+Finished Epoch 57
+Training Loss: 0.32214386579350757
+Avg Test Loss 0.3193487380899346
+Mean Relative Error (I_target): 5.679722309112549
+LR: 1.25e-05
+Epoch time: 45.77s
+Finished Epoch 58
+Training Loss: 0.32211446871732446
+Avg Test Loss 0.3193435929000759
+Mean Relative Error (I_target): 5.655770301818848
+LR: 1.25e-05
+Epoch time: 45.70s
+Finished Epoch 59
+Training Loss: 0.32211924150204746
+Avg Test Loss 0.31933743627404354
+Mean Relative Error (I_target): 5.673975944519043
+LR: 1.25e-05
+Epoch time: 45.38s
+Finished Epoch 60
+Training Loss: 0.3221226373595446
+Avg Test Loss 0.3193321566718982
+Mean Relative Error (I_target): 5.6915059089660645
+LR: 1.25e-05
+Epoch time: 45.29s
+Finished Epoch 61
+Training Loss: 0.32211316179422833
+Avg Test Loss 0.3193351582073962
+Mean Relative Error (I_target): 5.656896591186523
+LR: 1.25e-05
+Epoch time: 45.15s
+Finished Epoch 62
+Training Loss: 0.3220964953221612
+Avg Test Loss 0.31932865200774757
+Mean Relative Error (I_target): 5.693618297576904
+LR: 1.25e-05
+Epoch time: 45.21s
+Finished Epoch 63
+Training Loss: 0.32211084781687915
+Avg Test Loss 0.3193213431152708
+Mean Relative Error (I_target): 5.633192539215088
+LR: 1.25e-05
+Epoch time: 45.33s
+Finished Epoch 64
+Training Loss: 0.3221294956938985
+Avg Test Loss 0.3193129784802892
+Mean Relative Error (I_target): 5.63187313079834
+LR: 1.25e-05
+Epoch time: 43.77s
+Finished Epoch 65
+Training Loss: 0.32211804575877606
+Avg Test Loss 0.3193011400796203
+Mean Relative Error (I_target): 5.688340187072754
+LR: 1.25e-05
+Epoch time: 43.77s
+Finished Epoch 66
+Training Loss: 0.3221063084314685
+Avg Test Loss 0.31929293754639654
+Mean Relative Error (I_target): 5.721791744232178
+LR: 1.25e-05
+Epoch time: 43.72s
+Finished Epoch 67
+Training Loss: 0.32208066344451863
+Avg Test Loss 0.3193032266711121
+Mean Relative Error (I_target): 5.62747049331665
+LR: 1.25e-05
+Epoch time: 43.78s
+Finished Epoch 68
+Training Loss: 0.32208931430411514
+Avg Test Loss 0.31929184644143466
+Mean Relative Error (I_target): 5.628789901733398
+LR: 1.25e-05
+Epoch time: 43.83s
+Finished Epoch 69
+Training Loss: 0.32204278079040305
+Avg Test Loss 0.31926837145710296
+Mean Relative Error (I_target): 5.719139099121094
+LR: 1.25e-05
+Epoch time: 43.90s
+Finished Epoch 70
+Training Loss: 0.32203471414077434
+Avg Test Loss 0.3192641030210676
+Mean Relative Error (I_target): 5.6890130043029785
+LR: 1.25e-05
+Epoch time: 43.71s
+Finished Epoch 71
+Training Loss: 0.3220513737002827
+Avg Test Loss 0.3192476547126577
+Mean Relative Error (I_target): 5.671329498291016
+LR: 1.25e-05
+Epoch time: 43.77s
+Finished Epoch 72
+Training Loss: 0.3220347274959741
+Avg Test Loss 0.319247554344282
+Mean Relative Error (I_target): 5.6753010749816895
+LR: 1.25e-05
+Epoch time: 43.69s
+Finished Epoch 73
+Training Loss: 0.3220129668494683
+Avg Test Loss 0.3192395575360449
+Mean Relative Error (I_target): 5.679513454437256
+LR: 1.25e-05
+Epoch time: 43.75s
+Finished Epoch 74
+Training Loss: 0.3220527957668579
+Avg Test Loss 0.3192461553349424
+Mean Relative Error (I_target): 5.648909568786621
+LR: 1.25e-05
+Epoch time: 43.81s
+Finished Epoch 75
+Training Loss: 0.32202935250138887
+Avg Test Loss 0.31924649291455365
+Mean Relative Error (I_target): 5.616963863372803
+LR: 1.25e-05
+Epoch time: 43.83s
+Finished Epoch 76
+Training Loss: 0.3220252064167364
+Avg Test Loss 0.31924940016605197
+Mean Relative Error (I_target): 5.6102728843688965
+LR: 1.25e-05
+Epoch time: 43.78s
+Finished Epoch 77
+Training Loss: 0.32200195562686956
+Avg Test Loss 0.3192375577938582
+Mean Relative Error (I_target): 5.636375427246094
+LR: 1.25e-05
+Epoch time: 43.73s
+Finished Epoch 78
+Training Loss: 0.32201725027270245
+Avg Test Loss 0.31925668791413053
+Mean Relative Error (I_target): 5.595834732055664
+LR: 6.25e-06
+Epoch time: 43.83s
+Finished Epoch 79
+Training Loss: 0.32204083830690255
+Avg Test Loss 0.3192505130031978
+Mean Relative Error (I_target): 5.601158142089844
+LR: 6.25e-06
+Epoch time: 43.75s
+Finished Epoch 80
+Training Loss: 0.3220253408064136
+Avg Test Loss 0.31923986045218733
+Mean Relative Error (I_target): 5.667009353637695
+LR: 6.25e-06
+Epoch time: 43.71s
+Finished Epoch 81
+Training Loss: 0.3220345420487075
+Avg Test Loss 0.3192343988588878
+Mean Relative Error (I_target): 5.679537296295166
+LR: 6.25e-06
+Epoch time: 43.72s
+Finished Epoch 82
+Training Loss: 0.32202652705598356
+Avg Test Loss 0.3192367792955594
+Mean Relative Error (I_target): 5.639377117156982
+LR: 6.25e-06
+Epoch time: 43.77s
+Finished Epoch 83
+Training Loss: 0.32201697755012476
+Avg Test Loss 0.31923447374596015
+Mean Relative Error (I_target): 5.640346527099609
+LR: 6.25e-06
+Epoch time: 43.69s
+Finished Epoch 84
+Training Loss: 0.3220451088244235
+Avg Test Loss 0.3192349624500346
+Mean Relative Error (I_target): 5.63584041595459
+LR: 6.25e-06
+Epoch time: 43.74s
+Finished Epoch 85
+Training Loss: 0.3219906099998755
+Avg Test Loss 0.31922981829277236
+Mean Relative Error (I_target): 5.6509857177734375
+LR: 6.25e-06
+Epoch time: 43.72s
+Finished Epoch 86
+Training Loss: 0.3220150357408541
+Avg Test Loss 0.3192272372623242
+Mean Relative Error (I_target): 5.641693115234375
+LR: 6.25e-06
+Epoch time: 43.55s
+Finished Epoch 87
+Training Loss: 0.3220121569631849
+Avg Test Loss 0.31921745210822455
+Mean Relative Error (I_target): 5.639718055725098
+LR: 6.25e-06
+Epoch time: 43.58s
+Finished Epoch 88
+Training Loss: 0.322008706962986
+Avg Test Loss 0.3192239521122945
+Mean Relative Error (I_target): 5.631950378417969
+LR: 6.25e-06
+Epoch time: 43.55s
+Finished Epoch 89
+Training Loss: 0.322019817706
+Avg Test Loss 0.31922378761173564
+Mean Relative Error (I_target): 5.623133182525635
+LR: 6.25e-06
+Epoch time: 43.58s
+Finished Epoch 90
+Training Loss: 0.32199644840831515
+Avg Test Loss 0.31922469326237374
+Mean Relative Error (I_target): 5.617519378662109
+LR: 3.125e-06
+Epoch time: 43.49s
+Finished Epoch 91
+Training Loss: 0.32199408593408807
+Avg Test Loss 0.3192293914968271
+Mean Relative Error (I_target): 5.608691215515137
+LR: 3.125e-06
+Epoch time: 46.17s
+Finished Epoch 92
+Training Loss: 0.322006352674863
+Avg Test Loss 0.3192229402789683
+Mean Relative Error (I_target): 5.6230692863464355
+LR: 3.125e-06
+Epoch time: 56.53s
+Finished Epoch 93
+Training Loss: 0.3220011516656366
+Avg Test Loss 0.3192255228821403
+Mean Relative Error (I_target): 5.608085632324219
+LR: 3.125e-06
+Epoch time: 55.46s
+Finished Epoch 94
+Training Loss: 0.322013231168009
+Avg Test Loss 0.3192202739560528
+Mean Relative Error (I_target): 5.616155624389648
+LR: 3.125e-06
+Epoch time: 56.51s
+Finished Epoch 95
+Training Loss: 0.3219802051210534
+Avg Test Loss 0.31921816062825575
+Mean Relative Error (I_target): 5.613486289978027
+LR: 3.125e-06
+Epoch time: 55.30s
+Finished Epoch 96
+Training Loss: 0.32198819370984594
+Avg Test Loss 0.31921774577865725
+Mean Relative Error (I_target): 5.6144328117370605
+LR: 3.125e-06
+Epoch time: 55.41s
+Finished Epoch 97
+Training Loss: 0.3220053246650007
+Avg Test Loss 0.31921587207678287
+Mean Relative Error (I_target): 5.610847473144531
+LR: 3.125e-06
+Epoch time: 56.70s
+Finished Epoch 98
+Training Loss: 0.32200660224888183
+Avg Test Loss 0.3192099124701547
+Mean Relative Error (I_target): 5.624453067779541
+LR: 3.125e-06
+Epoch time: 55.63s
+Finished Epoch 99
+Training Loss: 0.32198790460824966
+Avg Test Loss 0.319204397610764
+Mean Relative Error (I_target): 5.633087158203125
+LR: 1.5625e-06
+Epoch time: 56.62s
+Finished Epoch 100
+Training Loss: 0.3219722973513102
+Avg Test Loss 0.31920520608613234
+Mean Relative Error (I_target): 5.626762866973877
+LR: 1.5625e-06
+Epoch time: 55.82s
+Bundled (design-house + foundry) checkpoint saved to /nfs/stak/users/jonesm25/CurrentPrediction/results/model_22nm_LP_both.pt
+[sweep] Copied bundled checkpoint to privacy/
+Strict design-house checkpoint saved to /nfs/stak/users/jonesm25/CurrentPrediction/results/model_22nm_LP_both_design_house.pt
+[sweep] Copied design-house checkpoint to privacy/
+Foundry-side checkpoint saved to /nfs/stak/users/jonesm25/CurrentPrediction/results/model_22nm_LP_both_foundry.pt
+[sweep] Copied foundry checkpoint to privacy/
+[sweep] Saved run metadata to /nfs/stak/users/jonesm25/CurrentPrediction/privacy/run_metadata_22nm_LP_both.json
+
+[sweep] Running split inference...
+/nfs/stak/users/renya/jonesm25/.conda/envs/currentprediction/bin/python /nfs/stak/users/jonesm25/CurrentPrediction/privacy/split/predict.py --input /nfs/stak/users/jonesm25/CurrentPrediction/dataset/dataset_22nm_LP.json --output /nfs/stak/users/jonesm25/CurrentPrediction/privacy/predictions_22nm_LP_both.csv --checkpoint /nfs/stak/users/jonesm25/CurrentPrediction/results/model_22nm_LP_both.pt
+[dataset] imports complete
+[dataset] using DATASET: /nfs/stak/users/jonesm25/CurrentPrediction/dataset/dataset_22nm_LP.json
+[dataset] loading JSON...
+[dataset] loaded 100000 rows
+[dataset] normalizing labels...
+[dataset] 1 unique process(es): ['22nm_LP']
+===================Data loaded successfully===============
+head
+   Size  Option       WN1       WP1  ...     SkewL     SkewR  Design  _process
+0   0.0     0.0 -1.100689 -0.919121  ... -1.118034 -1.118034    2inv   22nm_LP
+1   0.0     0.0  0.152634  1.208885  ... -1.118034 -1.118034    2inv   22nm_LP
+2   0.0     0.0  1.267764  0.784693  ... -1.118034 -1.118034    2inv   22nm_LP
+3   0.0     0.0 -1.715803  0.591564  ... -1.118034 -1.118034    2inv   22nm_LP
+4   0.0     0.0 -0.991644  1.602858  ... -1.118034 -1.118034    2inv   22nm_LP
+
+[5 rows x 24 columns]
+infomation
+<class 'pandas.DataFrame'>
+RangeIndex: 100000 entries, 0 to 99999
+Data columns (total 24 columns):
+ #   Column    Non-Null Count   Dtype  
+---  ------    --------------   -----  
+ 0   Size      100000 non-null  float64
+ 1   Option    100000 non-null  float64
+ 2   WN1       100000 non-null  float64
+ 3   WP1       100000 non-null  float64
+ 4   WN2       100000 non-null  float64
+ 5   WP2       100000 non-null  float64
+ 6   L1        100000 non-null  float64
+ 7   L2        100000 non-null  float64
+ 8   VDD       100000 non-null  float64
+ 9   Temp      100000 non-null  float64
+ 10  V_vdd     100000 non-null  float64
+ 11  V_gnd     100000 non-null  float64
+ 12  V_in      100000 non-null  float64
+ 13  V_out     100000 non-null  float64
+ 14  V_target  100000 non-null  float64
+ 15  I_vdd     100000 non-null  float64
+ 16  I_gnd     100000 non-null  float64
+ 17  I_in      100000 non-null  float64
+ 18  I_out     100000 non-null  float64
+ 19  I_target  100000 non-null  float64
+ 20  SkewL     100000 non-null  float64
+ 21  SkewR     100000 non-null  float64
+ 22  Design    100000 non-null  str    
+ 23  _process  100000 non-null  str    
+dtypes: float64(22), str(2)
+memory usage: 18.3 MB
+None
+size of DF
+(100000, 24)
+[dataset] PUBLIC_FEATURE_COLS  (17): ['Size', 'Option', 'WN1', 'WP1', 'WN2', 'WP2', 'L1', 'L2', 'VDD', 'Temp', 'V_vdd', 'V_gnd', 'V_in', 'V_out', 'V_target', 'SkewL', 'SkewR']
+[dataset] PRIVATE_FEATURE_COLS (0): []
+[dataset] device: cuda:0
+/nfs/stak/users/jonesm25/CurrentPrediction/privacy/split/predict.py:67: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+  checkpoint = torch.load(checkpoint_path, map_location=device)
+Using device: cuda:0
+Loading checkpoint from /nfs/stak/users/jonesm25/CurrentPrediction/results/model_22nm_LP_both.pt ...
+  model=block, layers=3, hidden=64, heads=4
+  label_log_mean=-4.0285, label_log_std=1.9086
+  loaded foundry: 1 process(es)
+Loading data from /nfs/stak/users/jonesm25/CurrentPrediction/dataset/dataset_22nm_LP.json ...
+  100000 rows loaded
+Running inference ...
+Predictions saved to /nfs/stak/users/jonesm25/CurrentPrediction/privacy/predictions_22nm_LP_both.csv  (100000 rows)
+Embeddings, logits, and attention weights saved to /nfs/stak/users/jonesm25/CurrentPrediction/privacy/inference_outputs_22nm_LP_both.npz
+
+[sweep] Running privacy attacks...
+/nfs/stak/users/renya/jonesm25/.conda/envs/currentprediction/bin/python /nfs/stak/users/jonesm25/CurrentPrediction/privacy/privacy_attack.py --process 22nm_LP_both --privacy_dir /nfs/stak/users/jonesm25/CurrentPrediction/privacy
+Loaded embeddings shape: (100000, 6, 164)
+Loaded logits shape: (100000, 7)
+Loaded attention weights: 100000 layers
+[embedding_inversion] Baseline output saved.
+Loaded embeddings shape: (100000, 6, 164)
+Loaded logits shape: (100000, 7)
+Loaded attention weights: 100000 layers
+[edge_reconstruction] Baseline output saved.
+Loaded embeddings shape: (100000, 6, 164)
+Loaded logits shape: (100000, 7)
+Loaded attention weights: 100000 layers
+[membership_inference] Baseline output saved.
+
+=== Running Embedding Inversion ===
+[OK] Embedding Inversion completed.
+
+=== Running Edge Reconstruction ===
+[OK] Edge Reconstruction completed.
+
+=== Running Membership Inference ===
+[OK] Membership Inference completed.
+[sweep] Updated run metadata with post-training timing at /nfs/stak/users/jonesm25/CurrentPrediction/privacy/run_metadata_22nm_LP_both.json
+wandb: updating run metadata
+wandb: uploading summary, console lines 621-621
+wandb: 
+wandb: Run history:
+wandb:                  Avg Test Loss █▅▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:                          Epoch ▁▁▁▁▁▁▁▂▂▂▂▃▃▃▃▄▄▄▄▅▅▅▅▅▅▆▆▆▆▆▇▇▇▇▇▇▇███
+wandb:                             LR ████████▄▄▄▃▃▃▃▃▃▂▂▂▂▂▂▂▂▂▂▂▂▂▁▁▁▁▁▁▁▁▁▁
+wandb:  Max Relative Error (I_target) █▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb: Mean Relative Error (I_target) █▂▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:  Min Relative Error (I_target) █▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:                  Training Loss █▃▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb: 
+wandb: Run summary:
+wandb:                  Avg Test Loss 0.31921
+wandb:                          Epoch 100
+wandb:                             LR 0.0
+wandb:  Max Relative Error (I_target) 1434.93274
+wandb: Mean Relative Error (I_target) 5.62676
+wandb:  Min Relative Error (I_target) 1e-05
+wandb:                  Training Loss 0.32197
+wandb: 
+wandb: 🚀 View run 22nm_LP_both at: https://wandb.ai/yosemitesamurai/CurrentPrediction/runs/51h8hu5f
+wandb: ⭐️ View project at: https://wandb.ai/yosemitesamurai/CurrentPrediction
+wandb: Synced 5 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
+wandb: Find logs at: ./wandb/run-20260604_180132-51h8hu5f/logs
+[2026-06-04 19:30:42] sweep.py finished: 0
+[2026-06-04 19:30:42] Finished: Thu Jun  4 07:30:42 PM PDT 2026

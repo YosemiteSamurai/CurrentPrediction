@@ -1,0 +1,62 @@
+DP Implementation Notes (CurrentPrediction)
+Date: 2026-06-03
+
+Summary
+- The current DP modes are functional and mode-driven, but they are not yet a full accountant-verified DP-SGD implementation.
+- In other words: clipping/noise is applied, but formal epsilon/delta accounting is not yet produced for each run.
+
+What Is Implemented Now
+1) Mode wiring / orchestration
+- integrated_pipeline.py prompts for privacy mode: neither, dp, sl, both (default: neither).
+- PRIVACY_MODE is exported through sbatch and consumed by training launch scripts.
+
+2) Monolithic training path (python/sweep.py)
+- PRIVACY_MODE=dp applies gradient clipping and Gaussian noise during training.
+- The setting is operational and run metadata includes DP-related configuration values.
+
+3) Split-learning path (privacy/split/*)
+- PRIVACY_MODE=sl routes to split-learning backend.
+- PRIVACY_MODE=both enables split-learning plus DP-style clipping/noise on:
+  - design-house model gradients (split/dataset.py)
+  - foundry encoder gradients (split/foundry.py)
+
+Why This Is Not Yet "Formal DP" (Strict Accounting)
+- Current clipping/noise is practical and useful, but not yet a full end-to-end, accountant-backed DP-SGD guarantee.
+- The following are still missing:
+  1. True per-sample gradient clipping guarantees across all affected optimizers/layers.
+  2. A privacy accountant that tracks cumulative privacy spend over training.
+  3. Noise calibration from target epsilon/delta (rather than only fixed runtime parameters).
+  4. Explicit sampling/accounting assumptions captured per run.
+  5. Final reported epsilon at chosen delta in artifacts/metadata.
+
+Interpretation for Use
+- Current DP mode should be treated as privacy-regularized training behavior.
+- It can reduce leakage empirically, but should not yet be claimed as a formally certified (epsilon, delta)-DP result.
+
+What "Strict DP Accounting" Follow-up Should Add
+1) Accountant-backed DP-SGD
+- Integrate an accountant (e.g., Opacus RDP/PRV style accounting) for each trained component.
+- Compute/report epsilon for a selected delta.
+
+2) Target-based configuration
+- Accept target epsilon/delta and calibrate noise multiplier accordingly.
+
+3) Run reporting
+- Persist in run metadata:
+  - privacy mode
+  - sample rate / effective batch semantics
+  - clipping norm
+  - noise multiplier
+  - training steps
+  - final epsilon, delta
+
+4) Split-learning accounting policy
+- Define whether DP guarantee applies to:
+  - design-house side only,
+  - foundry side only,
+  - or both sides independently/jointly.
+- Record separate accounting for each optimizer if both are private.
+
+Practical Bottom Line
+- The system is now ready for experimentation with mode-selectable privacy behavior.
+- If strict, auditable DP claims are required, implement the accountant-backed follow-up before making formal DP guarantees.

@@ -1,0 +1,72 @@
+Using Python: /nfs/stak/users/renya/jonesm25/.conda/envs/currentprediction/bin/python
+Validating dataset: dataset_22nm_LP
+
+=== Validating 22nm_LP_baseline ===
+[validate_privacy_artifacts] dataset: /nfs/stak/users/jonesm25/CurrentPrediction/dataset/dataset_22nm_LP.json
+[validate_privacy_artifacts] process: 22nm_LP
+[validate_privacy_artifacts] tag: baseline
+[validate_privacy_artifacts] privacy_dir: /nfs/stak/users/jonesm25/CurrentPrediction/privacy
+[validate_privacy_artifacts] found train_ids_22nm_LP_baseline.npy (70000 IDs)
+[validate_privacy_artifacts] found membership_labels_22nm_LP_baseline.npz
+[validate_privacy_artifacts] found original_embeddings_22nm_LP_baseline.npz
+[validate_privacy_artifacts] found ground_truth_edges_22nm_LP_baseline.npz
+[validate_privacy_artifacts] OK: original_embeddings_22nm_LP_baseline.npz (embedding inversion ground truth)
+[validate_privacy_artifacts] OK: ground_truth_edges_22nm_LP_baseline.npz (edge reconstruction ground truth)
+[validate_privacy_artifacts] OK: membership_labels_22nm_LP_baseline.npz (membership inference labels)
+[validate_privacy_artifacts] OK: inference_outputs_22nm_LP_baseline.npz (model inference outputs)
+[validate_privacy_artifacts] OK: predictions_22nm_LP_baseline.csv (privacy prediction CSV)
+[validate_privacy_artifacts] OK: model_22nm_LP_baseline.pt (trained checkpoint)
+[validate_privacy_artifacts] all required privacy artifacts are present
+
+=== Validating 22nm_LP_dp ===
+[validate_privacy_artifacts] dataset: /nfs/stak/users/jonesm25/CurrentPrediction/dataset/dataset_22nm_LP.json
+[validate_privacy_artifacts] process: 22nm_LP
+[validate_privacy_artifacts] tag: dp
+[validate_privacy_artifacts] privacy_dir: /nfs/stak/users/jonesm25/CurrentPrediction/privacy
+[validate_privacy_artifacts] found train_ids_22nm_LP_dp.npy (70000 IDs)
+[validate_privacy_artifacts] found membership_labels_22nm_LP_dp.npz
+[validate_privacy_artifacts] found original_embeddings_22nm_LP_dp.npz
+[validate_privacy_artifacts] found ground_truth_edges_22nm_LP_dp.npz
+[validate_privacy_artifacts] OK: original_embeddings_22nm_LP_dp.npz (embedding inversion ground truth)
+[validate_privacy_artifacts] OK: ground_truth_edges_22nm_LP_dp.npz (edge reconstruction ground truth)
+[validate_privacy_artifacts] OK: membership_labels_22nm_LP_dp.npz (membership inference labels)
+[validate_privacy_artifacts] OK: inference_outputs_22nm_LP_dp.npz (model inference outputs)
+[validate_privacy_artifacts] OK: predictions_22nm_LP_dp.csv (privacy prediction CSV)
+[validate_privacy_artifacts] OK: model_22nm_LP_dp.pt (trained checkpoint)
+[validate_privacy_artifacts] all required privacy artifacts are present
+
+=== Validating 22nm_LP_sl ===
+[validate_privacy_artifacts] dataset: /nfs/stak/users/jonesm25/CurrentPrediction/dataset/dataset_22nm_LP.json
+[validate_privacy_artifacts] process: 22nm_LP
+[validate_privacy_artifacts] tag: sl
+[validate_privacy_artifacts] privacy_dir: /nfs/stak/users/jonesm25/CurrentPrediction/privacy
+[validate_privacy_artifacts] found train_ids_22nm_LP_sl.npy (70000 IDs)
+[validate_privacy_artifacts] found membership_labels_22nm_LP_sl.npz
+[validate_privacy_artifacts] found original_embeddings_22nm_LP_sl.npz
+[validate_privacy_artifacts] found ground_truth_edges_22nm_LP_sl.npz
+[validate_privacy_artifacts] OK: original_embeddings_22nm_LP_sl.npz (embedding inversion ground truth)
+[validate_privacy_artifacts] OK: ground_truth_edges_22nm_LP_sl.npz (edge reconstruction ground truth)
+[validate_privacy_artifacts] OK: membership_labels_22nm_LP_sl.npz (membership inference labels)
+[validate_privacy_artifacts] OK: inference_outputs_22nm_LP_sl.npz (model inference outputs)
+[validate_privacy_artifacts] OK: predictions_22nm_LP_sl.csv (privacy prediction CSV)
+[validate_privacy_artifacts] OK: model_22nm_LP_sl.pt (trained checkpoint)
+[validate_privacy_artifacts] all required privacy artifacts are present
+
+=== Validating 22nm_LP_both ===
+[validate_privacy_artifacts] dataset: /nfs/stak/users/jonesm25/CurrentPrediction/dataset/dataset_22nm_LP.json
+[validate_privacy_artifacts] process: 22nm_LP
+[validate_privacy_artifacts] tag: both
+[validate_privacy_artifacts] privacy_dir: /nfs/stak/users/jonesm25/CurrentPrediction/privacy
+[validate_privacy_artifacts] found train_ids_22nm_LP_both.npy (70000 IDs)
+[validate_privacy_artifacts] found membership_labels_22nm_LP_both.npz
+[validate_privacy_artifacts] found original_embeddings_22nm_LP_both.npz
+[validate_privacy_artifacts] found ground_truth_edges_22nm_LP_both.npz
+[validate_privacy_artifacts] OK: original_embeddings_22nm_LP_both.npz (embedding inversion ground truth)
+[validate_privacy_artifacts] OK: ground_truth_edges_22nm_LP_both.npz (edge reconstruction ground truth)
+[validate_privacy_artifacts] OK: membership_labels_22nm_LP_both.npz (membership inference labels)
+[validate_privacy_artifacts] OK: inference_outputs_22nm_LP_both.npz (model inference outputs)
+[validate_privacy_artifacts] OK: predictions_22nm_LP_both.csv (privacy prediction CSV)
+[validate_privacy_artifacts] OK: model_22nm_LP_both.pt (trained checkpoint)
+[validate_privacy_artifacts] all required privacy artifacts are present
+
+All validations completed for 22nm_LP across baseline/dp/sl/both.

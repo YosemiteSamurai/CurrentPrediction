@@ -14,6 +14,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from pandas.api.types import is_numeric_dtype
 
 
 def resolve_dataset_path(dataset_value, repo_root):
@@ -101,6 +102,7 @@ def main():
 
     process = dataset_process_name(dataset_path)
     tag_suffix = f"_{args.tag.strip()}" if args.tag.strip() else ""
+    process_with_tag = f"{process}{tag_suffix}"
     print(f"[validate_privacy_artifacts] dataset: {dataset_path}")
     print(f"[validate_privacy_artifacts] process: {process}")
     print(f"[validate_privacy_artifacts] tag: {args.tag.strip() or '<none>'}")
@@ -124,23 +126,48 @@ def main():
         np.save(train_ids_path, train_ids)
         print(f"[validate_privacy_artifacts] wrote {train_ids_path.name} ({train_ids.shape[0]} IDs)")  # original: print(f"[validate_privacy_artifacts] wrote train_ids.npy ({train_ids.shape[0]} IDs)")
 
-    membership_labels_path = privacy_dir / f"membership_labels_{process}.npz"
+    membership_labels_path = privacy_dir / f"membership_labels_{process_with_tag}.npz"
+    legacy_membership_labels_path = privacy_dir / f"membership_labels_{process}.npz"
     if not membership_labels_path.exists():
         labels = np.isin(frame["ID"].to_numpy(), train_ids).astype(int)
         np.savez(membership_labels_path, labels=labels)
         print(f"[validate_privacy_artifacts] wrote {membership_labels_path.name}")
+        if legacy_membership_labels_path.exists():
+            print(f"[validate_privacy_artifacts] NOTE: legacy {legacy_membership_labels_path.name} also exists")
     else:
         print(f"[validate_privacy_artifacts] found {membership_labels_path.name}")
 
+    embeddings_path = privacy_dir / f"original_embeddings_{process_with_tag}.npz"
+    if not embeddings_path.exists():
+        drop = {"ID", "Design", "Skew", "PVT", "Option"}
+        feature_cols = [
+            c for c in frame.columns
+            if c not in drop and is_numeric_dtype(frame[c])
+        ]
+        embeddings = frame[feature_cols].to_numpy()
+        np.savez(embeddings_path, embeddings=embeddings)
+        print(f"[validate_privacy_artifacts] wrote {embeddings_path.name} ({embeddings.shape})")
+    else:
+        print(f"[validate_privacy_artifacts] found {embeddings_path.name}")
+
+    edges_path = privacy_dir / f"ground_truth_edges_{process_with_tag}.npz"
+    if not edges_path.exists():
+        edge_cols = [c for c in frame.columns if c.startswith("I_")]
+        edges = frame[edge_cols].to_numpy()
+        np.savez(edges_path, edges=edges)
+        print(f"[validate_privacy_artifacts] wrote {edges_path.name} ({edges.shape})")
+    else:
+        print(f"[validate_privacy_artifacts] found {edges_path.name}")
+
     required_files = {
-        f"original_embeddings_{process}.npz": "embedding inversion ground truth",
-        f"ground_truth_edges_{process}.npz": "edge reconstruction ground truth",
-        f"membership_labels_{process}.npz": "membership inference labels",
-        f"inference_outputs_{process}.npz": "model inference outputs",
+        f"original_embeddings_{process_with_tag}.npz": "embedding inversion ground truth",
+        f"ground_truth_edges_{process_with_tag}.npz": "edge reconstruction ground truth",
+        f"membership_labels_{process_with_tag}.npz": "membership inference labels",
+        f"inference_outputs_{process_with_tag}.npz": "model inference outputs",
     }
     optional_files = {
-        f"predictions_{process}.csv": "privacy prediction CSV",
-        f"model_{process}.pt": "trained checkpoint",
+        f"predictions_{process_with_tag}.csv": "privacy prediction CSV",
+        f"model_{process_with_tag}.pt": "trained checkpoint",
     }
 
     missing_required = []

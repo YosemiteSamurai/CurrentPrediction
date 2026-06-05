@@ -36,6 +36,12 @@ parser = argparse.ArgumentParser(description="End-to-end pipeline for CurrentPre
 parser.add_argument('--no-slurm', action='store_true', help='Run training locally without SLURM')
 parser.add_argument('--run-tag', default='', help='Run name tag appended to saved artifacts (default: baseline)')  # original: parser.add_argument('--run-tag', default='', help='Run name tag appended to saved artifacts (use baseline for default filenames)')
 parser.add_argument('--resume-inference-only', action='store_true', help='Skip training and rerun only inference/artifact export from existing checkpoint')
+parser.add_argument('--privacy-mode', default='', help='Privacy mode for training: neither, dp, sl, or both (default: prompt -> neither)')
+parser.add_argument('--model', default='', help='Process model name (e.g., 22nm_LP or 22nm_LP.pm) to skip selection prompt')
+parser.add_argument('--re-simulate', default='', help='Dataset action when dataset exists: yes/no (yes=re-simulate, no=reuse existing dataset)')
+parser.add_argument('--min-dataset-size', type=int, default=0, help='Minimum dataset size for simulation (positive integer)')
+parser.add_argument('--clean-logs', default='', help='Clean logs directory before submit: yes/no')
+parser.add_argument('--monitor', action='store_true', help='After submitting training, run monitor_squeue.py and wait until that specific JOBID finishes')
 args = parser.parse_args()
 
 # Clear the screen
@@ -54,14 +60,20 @@ def train_model(dataset_path, design='2inv', inference_only=False):  # original:
     project_root_local = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
     train_sbatch = os.path.join(project_root_local, 'scripts', 'train.sbatch')
     sweep_py = os.path.join(project_root_local, 'python', 'sweep.py')
+    split_sweep_py = os.path.join(project_root_local, 'privacy', 'split', 'sweep.py')
+    local_sweep_py = split_sweep_py if EFFECTIVE_PRIVACY_MODE in ('sl', 'both') else sweep_py
 
     if args.no_slurm:
-        print(f"[NO-SLURM MODE] Running {mode_label} locally: {sweep_py}")  # original: print(f"[NO-SLURM MODE] Running training locally: {sweep_py}")
+        print(f"[NO-SLURM MODE] Running {mode_label} locally: {local_sweep_py}")  # original: print(f"[NO-SLURM MODE] Running training locally: {sweep_py}")
+        print(f"[NO-SLURM MODE] Privacy mode: {EFFECTIVE_PRIVACY_MODE}")
         # Import sweep.py as a module and call main(config)
         import importlib.util
         import types
         import sys as _sys
-        sweep_spec = importlib.util.spec_from_file_location("sweep", sweep_py)
+        sweep_spec = importlib.util.spec_from_file_location("sweep", local_sweep_py)  # original: sweep_spec = importlib.util.spec_from_file_location("sweep", sweep_py)
+        if sweep_spec is None or sweep_spec.loader is None:
+            print(f"[ERROR] Could not load training module spec from {local_sweep_py}", file=sys.stderr)
+            sys.exit(1)
         sweep = importlib.util.module_from_spec(sweep_spec)
         _sys.modules["sweep"] = sweep
         sweep_spec.loader.exec_module(sweep)
@@ -83,6 +95,7 @@ def train_model(dataset_path, design='2inv', inference_only=False):  # original:
         os.environ['DESIGN'] = design
         os.environ['RUN_TAG'] = EFFECTIVE_RUN_TAG  # original: os.environ['RUN_TAG'] = args.run_tag  # original: os.environ['DESIGN'] = design
         os.environ['INFERENCE_ONLY'] = '1' if inference_only else ''
+        os.environ['PRIVACY_MODE'] = EFFECTIVE_PRIVACY_MODE
         try:
             sweep.main(config)
         except Exception as e:
@@ -92,6 +105,8 @@ def train_model(dataset_path, design='2inv', inference_only=False):  # original:
             print(f"[NO-SLURM MODE] Inference-only complete. Check privacy/predictions_{process_name}{run_suffix}.csv and privacy/inference_outputs_{process_name}{run_suffix}.npz.")  # original: print(f"[NO-SLURM MODE] Inference-only complete. Check results/predictions_{process_name}{run_suffix}.csv and results/inference_outputs_{process_name}{run_suffix}.npz.")
         else:
             print(f"[NO-SLURM MODE] Training complete. Check results/model_{process_name}{run_suffix}.pt for output.")
+        if args.monitor:
+            print("[NO-SLURM MODE] --monitor ignored (no SLURM JOBID to monitor).")
         return None
     else:
         # SLURM rejects scripts with DOS line endings. If the file was checked out
@@ -107,7 +122,7 @@ def train_model(dataset_path, design='2inv', inference_only=False):  # original:
 
         cmd = [
             'sbatch', '--parsable',
-            f'--export=DATASET={dataset_name},DESIGN={design},RUN_TAG={EFFECTIVE_RUN_TAG},INFERENCE_ONLY={1 if inference_only else 0}',
+            f'--export=DATASET={dataset_name},DESIGN={design},RUN_TAG={EFFECTIVE_RUN_TAG},INFERENCE_ONLY={1 if inference_only else 0},PRIVACY_MODE={EFFECTIVE_PRIVACY_MODE}',  # original: f'--export=DATASET={dataset_name},DESIGN={design},RUN_TAG={EFFECTIVE_RUN_TAG},INFERENCE_ONLY={1 if inference_only else 0}',
             train_sbatch,
         ]
         print(f"Submitting {mode_label} job for dataset '{dataset_name}'...")  # original: print(f"Submitting training job for dataset '{dataset_name}'...")
@@ -125,6 +140,7 @@ def train_model(dataset_path, design='2inv', inference_only=False):  # original:
         print(f"\nTraining job submitted: job ID {job_id}")
         if inference_only:
             print("  Mode:          inference-only (reuses existing checkpoint)")
+        print(f"  Privacy mode:  {EFFECTIVE_PRIVACY_MODE}")
         print(f"  Monitor with:  squeue -j {job_id}")
         print(f"  Output log:    logs/slurm-{job_id}.out")
         print(f"  Error log:     logs/slurm-{job_id}.err")
@@ -132,11 +148,83 @@ def train_model(dataset_path, design='2inv', inference_only=False):  # original:
         if inference_only:
             print(f"  Predictions:   privacy/predictions_{process_name}{run_suffix}.csv")  # original: print(f"  Predictions:   results/predictions_{process_name}{run_suffix}.csv")
             print(f"  Inference NPZ: privacy/inference_outputs_{process_name}{run_suffix}.npz\n")  # original: print(f"  Inference NPZ: results/inference_outputs_{process_name}{run_suffix}.npz\n")
+
+        if args.monitor:
+            monitor_py = os.path.join(os.path.dirname(__file__), 'monitor_squeue.py')
+            monitor_cmd = [
+                sys.executable,
+                monitor_py,
+                '--monitor',
+                '--job-id',
+                job_id,
+                '--model',
+                process_name,
+                '--run-tag',
+                EFFECTIVE_RUN_TAG,
+            ]
+            print(f"Starting job-specific monitor for JOBID {job_id}...")
+            print(f"Command: {' '.join(monitor_cmd)}")
+            subprocess.run(monitor_cmd, check=True)
         return job_id
 
 def extract_nm(filename):
     match = re.match(r'(\d+)nm', filename)
     return int(match.group(1)) if match else float('inf')
+
+
+def _normalize_resimulate_choice(raw_value):
+    value = (raw_value or '').strip().lower()
+    aliases = {
+        'y': True,
+        'yes': True,
+        'true': True,
+        '1': True,
+        'r': True,
+        'resimulate': True,
+        're-simulate': True,
+        'n': False,
+        'no': False,
+        'false': False,
+        '0': False,
+        'u': False,
+        'use': False,
+        'reuse': False,
+    }
+    if value not in aliases:
+        raise ValueError("--re-simulate must be yes/no (or y/n, true/false, use/reuse)")
+    return aliases[value]
+
+
+def _normalize_yes_no(raw_value, arg_name):
+    value = (raw_value or '').strip().lower()
+    aliases = {
+        'y': True,
+        'yes': True,
+        'true': True,
+        '1': True,
+        'n': False,
+        'no': False,
+        'false': False,
+        '0': False,
+    }
+    if value not in aliases:
+        raise ValueError(f"{arg_name} must be yes/no (or y/n, true/false)")
+    return aliases[value]
+
+
+def _resolve_model_path(model_arg, available_model_files):
+    raw = (model_arg or '').strip()
+    if not raw:
+        return None
+
+    target = raw if raw.endswith('.pm') else f"{raw}.pm"
+    target_lower = target.lower()
+
+    for model_path in available_model_files:
+        if os.path.basename(model_path).lower() == target_lower:
+            return model_path
+
+    return None
 
 # Sort by feature size (nm), largest last
 model_files.sort(key=lambda path: extract_nm(os.path.basename(path)))
@@ -147,22 +235,33 @@ for idx, model_path in enumerate(model_files):
     print(f"  [{idx+1}] {os.path.basename(model_path)}")
 print("")
 
-while True:
-    try:
-        model_idx = int(input("Select a process model by number: ")) - 1
-        if 0 <= model_idx < len(model_files):
-            break
-        else:
-            print("Invalid selection. Try again.")
-    except ValueError:
-        print("Please enter a number.")
+selected_model = _resolve_model_path(args.model, model_files)
+if selected_model is not None:
+    print(f"Using model from --model: {os.path.basename(selected_model)}")
+else:
+    if args.model.strip():
+        print(f"ERROR: --model '{args.model}' did not match any file in {MODELS_DIR}", file=sys.stderr)
+        sys.exit(2)
+    while True:
+        try:
+            model_idx = int(input("Select a process model by number: ")) - 1
+            if 0 <= model_idx < len(model_files):
+                break
+            else:
+                print("Invalid selection. Try again.")
+        except ValueError:
+            print("Please enter a number.")
+    selected_model = model_files[model_idx]
 
+if selected_model is None:
+    print("ERROR: model selection failed", file=sys.stderr)
+    sys.exit(2)
 
-selected_model = model_files[model_idx]
-print(f"Selected process model: {os.path.basename(selected_model)}")
+selected_model_name = os.path.basename(selected_model)
+print(f"Selected process model: {selected_model_name}")
 
 # Build dataset name from process model and set up paths
-process_name = os.path.splitext(os.path.basename(selected_model))[0]
+process_name = os.path.splitext(selected_model_name)[0]
 dataset_name = f"dataset_{process_name}"
 design_name = '2inv'  # You can prompt for this or generalize later
 
@@ -179,6 +278,26 @@ def _normalize_run_name(raw_name):
         return 'baseline', 'baseline'
     return safe, safe
 
+def _normalize_privacy_mode(raw_mode):
+    """Return canonical privacy mode: neither, dp, sl, or both."""
+    mode = (raw_mode or '').strip().lower()
+    aliases = {
+        '': 'neither',
+        'n': 'neither',
+        'none': 'neither',
+        'neither': 'neither',
+        'dp': 'dp',
+        'd': 'dp',
+        'sl': 'sl',
+        'split': 'sl',
+        's': 'sl',
+        'both': 'both',
+        'b': 'both',
+    }
+    if mode not in aliases:
+        raise ValueError("Privacy mode must be one of: neither, dp, sl, both")
+    return aliases[mode]
+
 if args.run_tag.strip():
     RUN_NAME, EFFECTIVE_RUN_TAG = _normalize_run_name(args.run_tag)
     print(f"Using run name from --run-tag: {RUN_NAME}")
@@ -186,6 +305,13 @@ else:
     _user_run_name = input("Enter run name [baseline]: ").strip()
     RUN_NAME, EFFECTIVE_RUN_TAG = _normalize_run_name(_user_run_name)
     print(f"Using run name: {RUN_NAME}")
+
+if args.privacy_mode.strip():
+    EFFECTIVE_PRIVACY_MODE = _normalize_privacy_mode(args.privacy_mode)
+else:
+    _privacy_prompt = input("Select privacy mode [neither/dp/sl/both] (default: neither): ").strip()
+    EFFECTIVE_PRIVACY_MODE = _normalize_privacy_mode(_privacy_prompt)
+print(f"Using privacy mode: {EFFECTIVE_PRIVACY_MODE}")
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 dataset_path = os.path.join(project_root, 'dataset', f'{dataset_name}.json')
@@ -207,17 +333,28 @@ if os.path.exists(dataset_path):
         size_str = f"{existing_rows:,} rows"
     except Exception as e:
         size_str = f"could not read size: {e}"
-    resp = input(
-        f"\nDataset file '{dataset_path}' already exists ({size_str}).\n"
-        f"Use this file to train the model, or re-simulate? "
-        f"[U=use / R=re-simulate]: "
-    ).strip().lower()
-    if resp == '' or resp.startswith('u'):
+    if args.re_simulate.strip():
+        try:
+            should_resimulate = _normalize_resimulate_choice(args.re_simulate)
+            print(f"Using dataset action from --re-simulate: {'re-simulate' if should_resimulate else 'use existing'}")
+        except ValueError as e:
+            print(f"ERROR: {e}", file=sys.stderr)
+            sys.exit(2)
+    else:
+        resp = input(
+            f"\nDataset file '{dataset_path}' already exists ({size_str}).\n"
+            f"Use this file to train the model, or re-simulate? "
+            f"[U=use / R=re-simulate]: "
+        ).strip().lower()
+        should_resimulate = not (resp == '' or resp.startswith('u'))
+    if not should_resimulate:
         print(f"\nUsing existing dataset: {dataset_path}.\nProceeding to training phase...\n")
         checkpoint_path = os.path.join(results_dir, f"model_{process_name}_{EFFECTIVE_RUN_TAG}.pt")
         inference_only = False
         if args.resume_inference_only:
             inference_only = True
+        elif args.re_simulate.strip():
+            inference_only = False
         elif os.path.exists(checkpoint_path):
             resume_resp = input(
                 f"Found existing checkpoint for this run name: {checkpoint_path}\n"
@@ -249,15 +386,19 @@ print(f"\nFound {num_pvt} PVT corners and {num_skew} skew corners, totaling {tot
 print("")
 
 # Step 3b: Prompt for minimum dataset size
-while True:
-    try:
-        min_dataset_size = int(input("Enter minimum dataset size: "))
-        if min_dataset_size > 0:
-            break
-        else:
-            print("Please enter a positive integer.")
-    except ValueError:
-        print("Please enter a valid integer.")
+if args.min_dataset_size > 0:
+    min_dataset_size = args.min_dataset_size
+    print(f"Using minimum dataset size from --min-dataset-size: {min_dataset_size}")
+else:
+    while True:
+        try:
+            min_dataset_size = int(input("Enter minimum dataset size: "))
+            if min_dataset_size > 0:
+                break
+            else:
+                print("Please enter a positive integer.")
+        except ValueError:
+            print("Please enter a valid integer.")
 
 # Step 3c: Calculate NUM_SAMPLES
 num_samples = math.ceil(min_dataset_size / (num_pvt * num_skew))
@@ -324,7 +465,7 @@ def _resubmit_failed(failed_ids, jobs_per_task, num_sims):
 
     export = (
         f"DESIGN={design_name},DATASET={dataset_name},"
-        f"NUM_SAMPLES={num_samples},MODEL={os.path.basename(selected_model)},"
+        f"NUM_SAMPLES={num_samples},MODEL={selected_model_name},"
         f"JOBS_PER_TASK={jobs_per_task},NUM_SIMS={num_sims}"
     )
 
@@ -338,7 +479,7 @@ def _resubmit_failed(failed_ids, jobs_per_task, num_sims):
 
     final_export = (
         f"DESIGN={design_name},DATASET={dataset_name},"
-        f"MODEL={os.path.basename(selected_model)}"
+        f"MODEL={selected_model_name}"
     )
     final_res = subprocess.run(
         ['sbatch', '--parsable',
@@ -363,14 +504,24 @@ def _read_dataset_rows(path):
 
 
 # Pass the model filename as the 4th argument
-cmd = [submit_sims_path, design_name, dataset_name, str(num_samples), os.path.basename(selected_model)]
+cmd = [submit_sims_path, design_name, dataset_name, str(num_samples), selected_model_name]
 
 # Clean up stale artifacts right before launching the simulation array.
 # Deferred to this point so reusing an existing dataset (which exited
 # earlier) doesn't wipe the logs directory. Files beginning with 'slurm'
 # are preserved by moving them into results/ rather than deleting.
-resp = input(f"Clean out the logs directory before submitting? [Y/n]: ").strip().lower()
-if resp == '' or resp.startswith('y'):
+if args.clean_logs.strip():
+    try:
+        should_clean_logs = _normalize_yes_no(args.clean_logs, '--clean-logs')
+        print(f"Using logs cleanup setting from --clean-logs: {'yes' if should_clean_logs else 'no'}")
+    except ValueError as e:
+        print(f"ERROR: {e}", file=sys.stderr)
+        sys.exit(2)
+else:
+    resp = input(f"Clean out the logs directory before submitting? [Y/n]: ").strip().lower()
+    should_clean_logs = (resp == '' or resp.startswith('y'))
+
+if should_clean_logs:
     import shutil
     for f in os.listdir(logs_dir):
         fp = os.path.join(logs_dir, f)

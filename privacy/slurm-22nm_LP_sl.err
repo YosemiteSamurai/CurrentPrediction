@@ -1,0 +1,3 @@
+/usr/bin/which: no conda in (/cm/local/apps/environment-modules/4.5.3//bin:/apps/slurm/bin:/apps/slurm/current/bin:/opt/TurboVNC/bin:/nfs/stak/users/jonesm25/perl5/bin:/cm/local/apps/environment-modules/4.5.3/bin:/usr/local/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/sbin:/sbin:/usr/sbin:/cm/local/apps/environment-modules/4.5.3/bin)
+ERROR: Unable to locate a modulefile for 'conda'
+[WARN] Could not load conda module; falling back to direct env python

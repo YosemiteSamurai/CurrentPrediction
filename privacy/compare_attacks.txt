@@ -1,0 +1,18 @@
+
+=== Embedding Inversion (MSE) ===
+baseline: 0.6618  [95% CI: 0.6565, 0.6667]
+dp: 0.5658  [95% CI: 0.5605, 0.5705]
+sl: 0.6947  [95% CI: 0.6894, 0.7006]
+both: 0.5513  [95% CI: 0.5470, 0.5564]
+
+=== Edge Reconstruction (Accuracy) ===
+baseline: 0.6513  [95% CI: 0.6487, 0.6535]
+dp: 0.5652  [95% CI: 0.5628, 0.5676]
+sl: 0.6425  [95% CI: 0.6405, 0.6445]
+both: 0.5281  [95% CI: 0.5257, 0.5304]
+
+=== Membership Inference (AUC) ===
+baseline: 0.5035  (holdout: 0.5032)
+dp: 0.5033  (holdout: 0.5041)
+sl: 0.5042  (holdout: 0.4977)
+both: 0.5027  (holdout: 0.4946)

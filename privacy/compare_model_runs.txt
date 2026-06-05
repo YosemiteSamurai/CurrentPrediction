@@ -1,0 +1,51 @@
+[compare_model_runs] process: 22nm_LP
+[compare_model_runs] privacy_dir: .
+
+=== baseline ===
+data prep/load: 0.07s
+training: 4842.59s
+epochs: 100
+avg epoch: 48.42s
+model: OK
+predictions: OK
+inference_outputs: OK
+embedding_inversion: OK
+edge_reconstruction: OK
+membership_inference: OK
+
+=== sl ===
+data prep/load: 2.76s
+training: 4095.14s
+epochs: 100
+avg epoch: 40.92s
+model: OK
+predictions: OK
+inference_outputs: OK
+embedding_inversion: OK
+edge_reconstruction: OK
+membership_inference: OK
+
+=== dp ===
+data prep/load: 0.07s
+training: 4789.51s
+epochs: 100
+avg epoch: 47.89s
+model: OK
+predictions: OK
+inference_outputs: OK
+embedding_inversion: OK
+edge_reconstruction: OK
+membership_inference: OK
+
+=== both ===
+data prep/load: 2.53s
+training: 4744.41s
+epochs: 100
+avg epoch: 47.42s
+model: OK
+predictions: OK
+inference_outputs: OK
+embedding_inversion: OK
+edge_reconstruction: OK
+membership_inference: OK
+

@@ -8,6 +8,7 @@ attack outputs for each run tag.
 import argparse
 import json
 import os
+import math
 from pathlib import Path
 
 
@@ -33,6 +34,16 @@ def file_status(privacy_dir, process, tag):
     return {name: path.exists() for name, path in names.items()}
 
 
+def format_seconds(value):
+    if value is None:
+        return "N/A"
+    if isinstance(value, (int, float)):
+        if isinstance(value, float) and math.isnan(value):
+            return "N/A"
+        return f"{value:.2f}s"
+    return str(value)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--process", required=True, help="Process name, e.g. 22nm_LP")
@@ -53,13 +64,15 @@ def main():
         if metadata is None:
             print(f"metadata: missing ({metadata_path})")
         else:
-            load_seconds = metadata.get("dataset_load_seconds")
+            load_seconds = metadata.get("data_prep_seconds")
+            if load_seconds is None or (isinstance(load_seconds, float) and math.isnan(load_seconds)):
+                load_seconds = metadata.get("dataset_load_seconds")
             train_seconds = metadata.get("training_seconds")
             epochs = metadata.get("epochs")
             epoch_seconds = metadata.get("epoch_seconds", [])
             avg_epoch = sum(epoch_seconds) / len(epoch_seconds) if epoch_seconds else None
-            print(f"dataset load: {load_seconds:.2f}s" if isinstance(load_seconds, (int, float)) else f"dataset load: {load_seconds}")
-            print(f"training: {train_seconds:.2f}s" if isinstance(train_seconds, (int, float)) else f"training: {train_seconds}")
+            print(f"data prep/load: {format_seconds(load_seconds)}")
+            print(f"training: {format_seconds(train_seconds)}")
             print(f"epochs: {epochs}")
             if avg_epoch is not None:
                 print(f"avg epoch: {avg_epoch:.2f}s")
