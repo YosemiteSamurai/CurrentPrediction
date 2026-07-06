@@ -1,0 +1,7 @@
+# Ensure shell and SLURM batch scripts always use LF line endings.
+# A CRLF shebang (e.g. '#!/bin/bash\r') makes the kernel look for an
+# interpreter named 'bash\r', which fails with ENOENT ("No such file or
+# directory"); sbatch likewise rejects DOS line endings. Pinning these to
+# LF prevents that regardless of the checkout platform or core.autocrlf.
+*.sh    text eol=lf
+*.sbatch text eol=lf

@@ -39,7 +39,8 @@ sys.path.insert(0, THIS_DIR)
 
 LOGS_DIR = os.path.join(PROJECT_ROOT, "logs")
 SIMS_DIR = os.path.join(PROJECT_ROOT, "sims")
-DATASET_DIR = os.path.join(PROJECT_ROOT, "dataset")
+RESULTS_DIR = os.path.join(PROJECT_ROOT, "results")  # where finalize writes metadata_<design>.json
+DATASET_DIR = os.path.join(PROJECT_ROOT, "datasets")  # original: DATASET_DIR = os.path.join(PROJECT_ROOT, "dataset")
 
 FAIL_MARKERS = (
     "Traceback", "error:", "Error:", "Killed", "CANCELLED",
@@ -166,7 +167,13 @@ def _print_finalize(paths):
 # ---------------------------------------------------------------------------
 
 def _load_aggregate(design):
-    path = os.path.join(SIMS_DIR, f"metadata_{design}.json")
+    # After a successful run the manifest is moved next to the dataset
+    # (datasets/); before/on failure it is still in results/. Check both.
+    path = os.path.join(DATASET_DIR, f"metadata_{design}.json")  # original: path = os.path.join(RESULTS_DIR, f"metadata_{design}.json")
+    if not os.path.exists(path):
+        results_path = os.path.join(RESULTS_DIR, f"metadata_{design}.json")
+        if os.path.exists(results_path):
+            path = results_path
     if not os.path.exists(path):
         return path, None
     try:

@@ -66,7 +66,7 @@ log "PATH: $PATH"
 log "Conda base: $(which conda || echo 'conda not found')"
 
 
-CONDA_ENV_PY="/nfs/stak/users/renya/jonesm25/.conda/envs/currentprediction/bin/python"
+CONDA_ENV_PY="/nfs/stak/users/jonesm25/.conda/envs/currentprediction/bin/python"
 PYTHON_BIN=""
 
 # Load conda module (needed for conda to be available, but we call the
@@ -110,40 +110,101 @@ PROJECT_DIR="/nfs/stak/users/jonesm25/CurrentPrediction"
 mkdir -p "$PROJECT_DIR/logs"
 
 
-	log "About to run hello world test: $PYTHON_BIN"
-	if ! "$PYTHON_BIN" -c "print('Hello world from SLURM batch!')"; then
-		echo "[ERROR] Python hello world test failed" >&2
-		exit 3
-	fi
-	log "Hello world test finished: $?"
+# Archive the finalize (simulation) job's logs under results/, keyed by
+# process model AND run tag (e.g. results/22nm_LP_baseline_simulation.{out,err}).
+# This training job runs afterok:finalize, so the finalize logs are complete
+# and closed by now. Empty .err files are not archived (and any stale copy is
+# removed). Guarded so archiving never aborts training.
+archive_finalize_logs() {
+	local dataset="${DATASET:-}"
+	local model="${dataset#dataset_}"
+	local tag="${RUN_TAG:-baseline}"  # untagged runs archive as <model>_baseline_* (matches the Python convention)
+	local suffix="${model}_${tag}"
 
-	log "Running lightweight preflight (paths and inputs)"
+	local src_out=""
+	local src_err=""
+	if [ -n "${FINAL_JOB:-}" ] && [ -f "$PROJECT_DIR/logs/finalize-${FINAL_JOB}.out" ]; then
+		src_out="$PROJECT_DIR/logs/finalize-${FINAL_JOB}.out"
+		src_err="$PROJECT_DIR/logs/finalize-${FINAL_JOB}.err"
+	else
+		# Fall back to the most recent finalize-*.out if FINAL_JOB is unset.
+		src_out="$(ls -t "$PROJECT_DIR"/logs/finalize-*.out 2>/dev/null | head -1)"
+		[ -n "$src_out" ] && src_err="${src_out%.out}.err"
+	fi
+
+	if [ -n "$src_out" ] && [ -f "$src_out" ]; then
+		cp -f "$src_out" "$PROJECT_DIR/results/${suffix}_simulation.out" \
+			&& log "Archived finalize stdout -> results/${suffix}_simulation.out"
+	fi
+
+	local dst_err="$PROJECT_DIR/results/${suffix}_simulation.err"
+	if [ -n "$src_err" ] && [ -f "$src_err" ]; then
+		if [ -s "$src_err" ]; then
+			cp -f "$src_err" "$dst_err" \
+				&& log "Archived finalize stderr -> results/${suffix}_simulation.err"
+		else
+			rm -f "$dst_err"
+		fi
+	fi
+}
+archive_finalize_logs || log "[WARN] finalize log archiving failed (non-fatal)"
+
+# Archive this training job's own SLURM log under results/, keyed by process
+# model AND run tag (e.g. results/22nm_LP_baseline_training.{out,err}). Run
+# from an EXIT trap so the copy happens whether training succeeds or fails.
+# The source log is still open, so it captures everything up to the trap.
+archive_training_logs() {
+	local dataset="${DATASET:-}"
+	local model="${dataset#dataset_}"
+	local tag="${RUN_TAG:-baseline}"  # untagged runs archive as <model>_baseline_* (matches the Python convention)
+	local suffix="${model}_${tag}"
+
+	local src_out="$PROJECT_DIR/logs/slurm-${SLURM_JOB_ID}.out"
+	local src_err="$PROJECT_DIR/logs/slurm-${SLURM_JOB_ID}.err"
+
+	if [ -f "$src_out" ]; then
+		cp -f "$src_out" "$PROJECT_DIR/results/${suffix}_training.out" \
+			&& log "Archived training stdout -> results/${suffix}_training.out"
+	fi
+
+	local dst_err="$PROJECT_DIR/results/${suffix}_training.err"
+	if [ -f "$src_err" ] && [ -s "$src_err" ]; then
+		cp -f "$src_err" "$dst_err" \
+			&& log "Archived training stderr -> results/${suffix}_training.err"
+	else
+		rm -f "$dst_err"
+	fi
+}
+trap 'archive_training_logs || true' EXIT
+
+
 	PRIVACY_MODE="${PRIVACY_MODE:-neither}"
+	# Single unified entry point handles all PRIVACY_MODE values
+	# (neither|dp|sl|both) in-process; there is no separate split backend.
 	SWEEP_SCRIPT="$PROJECT_DIR/python/sweep.py"
-	if [ "$PRIVACY_MODE" = "sl" ] || [ "$PRIVACY_MODE" = "both" ]; then
-		SWEEP_SCRIPT="$PROJECT_DIR/privacy/split/sweep.py"
-		export SPLIT_LEARNING=1
-	fi
-	if [ ! -f "$PROJECT_DIR/python/sweep.py" ]; then
-		echo "[ERROR] Missing sweep.py at $PROJECT_DIR/python/sweep.py" >&2
-		exit 4
-	fi
 	if [ ! -f "$SWEEP_SCRIPT" ]; then
-		echo "[ERROR] Missing selected sweep script at $SWEEP_SCRIPT" >&2
+		echo "[ERROR] Missing sweep.py at $SWEEP_SCRIPT" >&2
 		exit 4
 	fi
-	if [ ! -d "$PROJECT_DIR/dataset" ]; then
-		echo "[ERROR] Missing dataset directory at $PROJECT_DIR/dataset" >&2
+	if [ ! -d "$PROJECT_DIR/datasets" ]; then
+		echo "[ERROR] Missing dataset directory at $PROJECT_DIR/datasets" >&2
 		exit 4
 	fi
-	log "[preflight] sweep.py found"
-	log "[preflight] dataset dir found"
-	log "[preflight] DATASET='${DATASET:-<unset>}' DESIGN='${DESIGN:-<unset>}'"
-	log "[preflight] PRIVACY_MODE='${PRIVACY_MODE}'"
-	log "[preflight] SWEEP_SCRIPT='${SWEEP_SCRIPT}'"
+
+	log "Run options (from integrated_pipeline.py):"
+	log "  DATASET        = ${DATASET:-<unset>}"
+	log "  DESIGN         = ${DESIGN:-<unset>}"
+	log "  RUN_TAG        = ${RUN_TAG:-<unset>}"
+	log "  PRIVACY_MODE   = ${PRIVACY_MODE}"
+	log "  INFERENCE_ONLY = ${INFERENCE_ONLY:-0}"
+	log "  RUN_ATTACKS    = ${RUN_ATTACKS:-0}"
+	if [ "$PRIVACY_MODE" = "dp" ] || [ "$PRIVACY_MODE" = "both" ]; then
+		log "  DP_NOISE_MULT  = ${DP_NOISE_MULTIPLIER:-0.6}"
+		log "  DP_MAX_GRAD    = ${DP_MAX_GRAD_NORM:-1.0}"
+	fi
 
 	log "About to run sweep.py: $PYTHON_BIN"
-	LAUNCH_CMD="import os, runpy, datetime; p='$SWEEP_SCRIPT'; now=lambda: datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'); print(f'[{now()}] [launcher] python alive', flush=True); print(f'[{now()}] [launcher] sweep exists: {os.path.exists(p)}', flush=True); runpy.run_path(p, run_name='__main__')"
+	LAUNCH_CMD="import runpy; runpy.run_path('$SWEEP_SCRIPT', run_name='__main__')"
 	PY_IMPORT_FLAGS=()
 	if [ "${IMPORT_TIME_TRACE:-0}" = "1" ]; then
 		PY_IMPORT_FLAGS=(-X importtime)

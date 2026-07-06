@@ -11,11 +11,13 @@
 #      results/) and always clean sims/ (per-run SPICE artifacts), then
 #      submit scripts/submit_sims.sh to run the ngspice array job +
 #      finalize job on SLURM.
-#   5. Wait for the finalized dataset JSON, sanity-check its row count,
-#      and if short, auto-resubmit only the failed array tasks (up to
-#      MAX_RETRIES times) before aborting.
-#   6. Remove per-run artifacts, then submit scripts/train.sbatch to
-#      train the GAN.
+#   5. Submit scripts/train.sbatch with an afterok dependency on the
+#      finalize job, so SLURM starts training only after the dataset has
+#      been built successfully, then exit (no login-node polling). Per-task
+#      retry and shortfall handling live inside the simulation array: a task
+#      that cannot produce its full NUM_SAMPLES fails, which blocks finalize
+#      (and therefore training) via the afterok chain. finalize cleans up
+#      per-run artifacts once the dataset is built.
 #
 # Designed to run from a submit node; all SLURM interaction is via sbatch.
 # =============================================================================
@@ -27,7 +29,6 @@ import math
 import subprocess
 import re
 import sys
-import time
 import argparse
 
 
@@ -37,6 +38,7 @@ parser.add_argument('--no-slurm', action='store_true', help='Run training locall
 parser.add_argument('--run-tag', default='', help='Run name tag appended to saved artifacts (default: baseline)')  # original: parser.add_argument('--run-tag', default='', help='Run name tag appended to saved artifacts (use baseline for default filenames)')
 parser.add_argument('--resume-inference-only', action='store_true', help='Skip training and rerun only inference/artifact export from existing checkpoint')
 parser.add_argument('--privacy-mode', default='', help='Privacy mode for training: neither, dp, sl, or both (default: prompt -> neither)')
+parser.add_argument('--run-attacks', default='', help='Run privacy attacks after training to produce attack artifacts: yes/no (default: prompt -> no)')
 parser.add_argument('--model', default='', help='Process model name (e.g., 22nm_LP or 22nm_LP.pm) to skip selection prompt')
 parser.add_argument('--re-simulate', default='', help='Dataset action when dataset exists: yes/no (yes=re-simulate, no=reuse existing dataset)')
 parser.add_argument('--min-dataset-size', type=int, default=0, help='Minimum dataset size for simulation (positive integer)')
@@ -51,17 +53,29 @@ os.system('cls' if os.name == 'nt' else 'clear')
 MODELS_DIR = os.path.join(os.path.dirname(__file__), '..', 'models')
 model_files = glob.glob(os.path.join(MODELS_DIR, '*.pm'))
 
-def train_model(dataset_path, design='2inv', inference_only=False):  # original: def train_model(dataset_path, design='2inv'):
-    """Train the GAN on the given dataset, either via SLURM or locally."""
+def train_model(dataset_path, design='2inv', inference_only=False, dependency=None):  # original: def train_model(dataset_path, design='2inv', inference_only=False):  # original: def train_model(dataset_path, design='2inv'):
+    """Train the GAN on the given dataset, either via SLURM or locally.
+
+    If ``dependency`` (a SLURM job id) is given, the training job is submitted
+    with --dependency=afterok:<id> so it starts only after that job succeeds.
+    """
     dataset_name = os.path.splitext(os.path.basename(dataset_path))[0]
     process_name = dataset_name[len('dataset_'):] if dataset_name.startswith('dataset_') else dataset_name
     run_suffix = f"_{EFFECTIVE_RUN_TAG}" if EFFECTIVE_RUN_TAG else ""
+
+    def _artifact(description, ext, sub=None):
+        """results/ artifact name: <process>_<tag>_<description>[_<sub>].<ext>."""
+        tag = run_suffix.lstrip('_') or 'baseline'
+        name = f"{process_name}_{tag}_{description}"
+        if sub:
+            name = f"{name}_{sub}"
+        return f"{name}.{ext}"
+
     mode_label = "inference-only" if inference_only else "training"
     project_root_local = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
     train_sbatch = os.path.join(project_root_local, 'scripts', 'train.sbatch')
     sweep_py = os.path.join(project_root_local, 'python', 'sweep.py')
-    split_sweep_py = os.path.join(project_root_local, 'privacy', 'split', 'sweep.py')
-    local_sweep_py = split_sweep_py if EFFECTIVE_PRIVACY_MODE in ('sl', 'both') else sweep_py
+    local_sweep_py = sweep_py  # single unified entry point handles all privacy modes  # original: local_sweep_py = split_sweep_py if EFFECTIVE_PRIVACY_MODE in ('sl', 'both') else sweep_py
 
     if args.no_slurm:
         print(f"[NO-SLURM MODE] Running {mode_label} locally: {local_sweep_py}")  # original: print(f"[NO-SLURM MODE] Running training locally: {sweep_py}")
@@ -89,6 +103,17 @@ def train_model(dataset_path, design='2inv', inference_only=False):  # original:
             epochs=100,
             edges_per_graph=7,
             target_edge_idx=3,
+            run_tag=EFFECTIVE_RUN_TAG,
+            # v3.0 split-learning knobs; sweep.main() sets split_learning and
+            # dp_enabled from PRIVACY_MODE, the rest are consumed when active.
+            split_learning=False,
+            embed_dim=16,
+            encoder_hidden=64,
+            nodes_per_graph=6,
+            pmos_offset=4,
+            dp_enabled=False,
+            dp_noise_multiplier=float(os.environ.get('DP_NOISE_MULTIPLIER', '0.6')),
+            dp_max_grad_norm=float(os.environ.get('DP_MAX_GRAD_NORM', '1.0')),
         )
         # Set DATASET and DESIGN environment variables for sweep.py
         os.environ['DATASET'] = dataset_name
@@ -96,15 +121,16 @@ def train_model(dataset_path, design='2inv', inference_only=False):  # original:
         os.environ['RUN_TAG'] = EFFECTIVE_RUN_TAG  # original: os.environ['RUN_TAG'] = args.run_tag  # original: os.environ['DESIGN'] = design
         os.environ['INFERENCE_ONLY'] = '1' if inference_only else ''
         os.environ['PRIVACY_MODE'] = EFFECTIVE_PRIVACY_MODE
+        os.environ['RUN_ATTACKS'] = '1' if EFFECTIVE_RUN_ATTACKS else ''
         try:
             sweep.main(config)
         except Exception as e:
             print(f"[ERROR] Local {mode_label} failed: {e}", file=sys.stderr)  # original: print(f"[ERROR] Local training failed: {e}", file=sys.stderr)
             sys.exit(1)
         if inference_only:
-            print(f"[NO-SLURM MODE] Inference-only complete. Check privacy/predictions_{process_name}{run_suffix}.csv and privacy/inference_outputs_{process_name}{run_suffix}.npz.")  # original: print(f"[NO-SLURM MODE] Inference-only complete. Check results/predictions_{process_name}{run_suffix}.csv and results/inference_outputs_{process_name}{run_suffix}.npz.")
+            print(f"[NO-SLURM MODE] Inference-only complete. Check results/{_artifact('predictions', 'csv')} and results/{_artifact('inference', 'npz')}.")  # original: print(f"[NO-SLURM MODE] Inference-only complete. Check privacy/predictions_{process_name}{run_suffix}.csv and privacy/inference_outputs_{process_name}{run_suffix}.npz.")
         else:
-            print(f"[NO-SLURM MODE] Training complete. Check results/model_{process_name}{run_suffix}.pt for output.")
+            print(f"[NO-SLURM MODE] Training complete. Check results/{_artifact('model', 'pt')} for output.")  # original: print(f"[NO-SLURM MODE] Training complete. Check results/model_{process_name}{run_suffix}.pt for output.")
         if args.monitor:
             print("[NO-SLURM MODE] --monitor ignored (no SLURM JOBID to monitor).")
         return None
@@ -122,10 +148,16 @@ def train_model(dataset_path, design='2inv', inference_only=False):  # original:
 
         cmd = [
             'sbatch', '--parsable',
-            f'--export=DATASET={dataset_name},DESIGN={design},RUN_TAG={EFFECTIVE_RUN_TAG},INFERENCE_ONLY={1 if inference_only else 0},PRIVACY_MODE={EFFECTIVE_PRIVACY_MODE}',  # original: f'--export=DATASET={dataset_name},DESIGN={design},RUN_TAG={EFFECTIVE_RUN_TAG},INFERENCE_ONLY={1 if inference_only else 0}',
+            f'--export=DATASET={dataset_name},DESIGN={design},RUN_TAG={EFFECTIVE_RUN_TAG},INFERENCE_ONLY={1 if inference_only else 0},PRIVACY_MODE={EFFECTIVE_PRIVACY_MODE},RUN_ATTACKS={1 if EFFECTIVE_RUN_ATTACKS else 0},FINAL_JOB={dependency or ""}',  # original: f'--export=DATASET={dataset_name},DESIGN={design},RUN_TAG={EFFECTIVE_RUN_TAG},INFERENCE_ONLY={1 if inference_only else 0},PRIVACY_MODE={EFFECTIVE_PRIVACY_MODE},RUN_ATTACKS={1 if EFFECTIVE_RUN_ATTACKS else 0}',  # original: f'--export=DATASET={dataset_name},DESIGN={design},RUN_TAG={EFFECTIVE_RUN_TAG},INFERENCE_ONLY={1 if inference_only else 0},PRIVACY_MODE={EFFECTIVE_PRIVACY_MODE}',  # original: f'--export=DATASET={dataset_name},DESIGN={design},RUN_TAG={EFFECTIVE_RUN_TAG},INFERENCE_ONLY={1 if inference_only else 0}',
             train_sbatch,
         ]
-        print(f"Submitting {mode_label} job for dataset '{dataset_name}'...")  # original: print(f"Submitting training job for dataset '{dataset_name}'...")
+        # When chained after simulation, gate training on the finalize job so
+        # SLURM (not the login-node pipeline) waits for the dataset to be built.
+        # The finalize job id is also exported (FINAL_JOB) so train.sbatch can
+        # archive that job's logs once it has completed.
+        if dependency:
+            cmd.insert(2, f'--dependency=afterok:{dependency}')
+        print(f"Submitting {mode_label} job using {dataset_name}...")
         result = subprocess.run(cmd, stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE, universal_newlines=True)
         if result.returncode != 0:
@@ -144,10 +176,10 @@ def train_model(dataset_path, design='2inv', inference_only=False):  # original:
         print(f"  Monitor with:  squeue -j {job_id}")
         print(f"  Output log:    logs/slurm-{job_id}.out")
         print(f"  Error log:     logs/slurm-{job_id}.err")
-        print(f"  Checkpoint:    results/model_{process_name}{run_suffix}.pt (when complete)\n")  # original: print(f"  Checkpoint:    results/model_{process_name}.pt (when complete)\n")
+        print(f"  Checkpoint:    results/{_artifact('model', 'pt')} (when complete)\n")  # original: print(f"  Checkpoint:    results/model_{process_name}{run_suffix}.pt (when complete)\n")
         if inference_only:
-            print(f"  Predictions:   privacy/predictions_{process_name}{run_suffix}.csv")  # original: print(f"  Predictions:   results/predictions_{process_name}{run_suffix}.csv")
-            print(f"  Inference NPZ: privacy/inference_outputs_{process_name}{run_suffix}.npz\n")  # original: print(f"  Inference NPZ: results/inference_outputs_{process_name}{run_suffix}.npz\n")
+            print(f"  Predictions:   results/{_artifact('predictions', 'csv')}")  # original: print(f"  Predictions:   privacy/predictions_{process_name}{run_suffix}.csv")
+            print(f"  Inference NPZ: results/{_artifact('inference', 'npz')}\n")  # original: print(f"  Inference NPZ: privacy/inference_outputs_{process_name}{run_suffix}.npz\n")
 
         if args.monitor:
             monitor_py = os.path.join(os.path.dirname(__file__), 'monitor_squeue.py')
@@ -302,19 +334,26 @@ if args.run_tag.strip():
     RUN_NAME, EFFECTIVE_RUN_TAG = _normalize_run_name(args.run_tag)
     print(f"Using run name from --run-tag: {RUN_NAME}")
 else:
-    _user_run_name = input("Enter run name [baseline]: ").strip()
+    _user_run_name = input("\nEnter run name [baseline]: ").strip()
     RUN_NAME, EFFECTIVE_RUN_TAG = _normalize_run_name(_user_run_name)
     print(f"Using run name: {RUN_NAME}")
 
 if args.privacy_mode.strip():
     EFFECTIVE_PRIVACY_MODE = _normalize_privacy_mode(args.privacy_mode)
 else:
-    _privacy_prompt = input("Select privacy mode [neither/dp/sl/both] (default: neither): ").strip()
+    _privacy_prompt = input("\nSelect privacy mode [neither/dp/sl/both] (default: neither): ").strip()
     EFFECTIVE_PRIVACY_MODE = _normalize_privacy_mode(_privacy_prompt)
 print(f"Using privacy mode: {EFFECTIVE_PRIVACY_MODE}")
 
+if args.run_attacks.strip():
+    EFFECTIVE_RUN_ATTACKS = args.run_attacks.strip().lower() in {'yes', 'y', '1', 'true'}
+else:
+    _attacks_prompt = input("\nRun privacy attacks after training (produces attack artifacts; slower)? [yes/no] (default: no): ").strip().lower()
+    EFFECTIVE_RUN_ATTACKS = _attacks_prompt in {'yes', 'y', '1', 'true'}
+print(f"Run privacy attacks: {'yes' if EFFECTIVE_RUN_ATTACKS else 'no'}")
+
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-dataset_path = os.path.join(project_root, 'dataset', f'{dataset_name}.json')
+dataset_path = os.path.join(project_root, 'datasets', f'{dataset_name}.json')  # original: dataset_path = os.path.join(project_root, 'dataset', f'{dataset_name}.json')
 logs_dir = os.path.join(project_root, 'logs')
 sims_dir = os.path.join(project_root, 'sims')
 results_dir = os.path.join(project_root, 'results')
@@ -348,8 +387,8 @@ if os.path.exists(dataset_path):
         ).strip().lower()
         should_resimulate = not (resp == '' or resp.startswith('u'))
     if not should_resimulate:
-        print(f"\nUsing existing dataset: {dataset_path}.\nProceeding to training phase...\n")
-        checkpoint_path = os.path.join(results_dir, f"model_{process_name}_{EFFECTIVE_RUN_TAG}.pt")
+        print(f"\nUsing existing dataset: {dataset_path}.\n\nProceeding to training phase...\n")
+        checkpoint_path = os.path.join(results_dir, f"{process_name}_{EFFECTIVE_RUN_TAG or 'baseline'}_model.pt")  # original: checkpoint_path = os.path.join(results_dir, f"model_{process_name}_{EFFECTIVE_RUN_TAG}.pt")
         inference_only = False
         if args.resume_inference_only:
             inference_only = True
@@ -418,91 +457,6 @@ def _parse_submit_output(text):
     return info
 
 
-def _find_failed_task_ids(array_job_id):
-    """Return sorted list of array-task indices whose .err is non-empty.
-
-    Matches logs/sim-<array_job_id>_<task>.err produced by sims.sbatch.
-    """
-    failed = []
-    pat = re.compile(rf'^sim-{re.escape(str(array_job_id))}_(\d+)\.err$')
-    try:
-        with os.scandir(logs_dir) as it:
-            for de in it:
-                m = pat.match(de.name)
-                if m and de.stat().st_size > 0:
-                    failed.append(int(m.group(1)))
-    except FileNotFoundError:
-        pass
-    return sorted(failed)
-
-
-def _compress_task_ids(ids):
-    """Compress a sorted list of ints into SLURM --array syntax (ranges+CSV)."""
-    if not ids:
-        return ""
-    parts = []
-    start = prev = ids[0]
-    for x in ids[1:]:
-        if x == prev + 1:
-            prev = x
-            continue
-        parts.append(f"{start}" if start == prev else f"{start}-{prev}")
-        start = prev = x
-    parts.append(f"{start}" if start == prev else f"{start}-{prev}")
-    return ",".join(parts)
-
-
-def _resubmit_failed(failed_ids, jobs_per_task, num_sims):
-    """Resubmit only the failed array tasks + a dependent finalize.
-
-    Pins JOBS_PER_TASK and NUM_SIMS to the original run's values so the
-    (task -> run_id) slicing in run_sims.py stays consistent.
-    Returns (new_array_job_id, new_final_job_id).
-    """
-    array_spec = _compress_task_ids(failed_ids)
-    print(f"  resubmitting tasks --array={array_spec}  "
-          f"(JOBS_PER_TASK={jobs_per_task}, NUM_SIMS={num_sims})")
-
-    export = (
-        f"DESIGN={design_name},DATASET={dataset_name},"
-        f"NUM_SAMPLES={num_samples},MODEL={selected_model_name},"
-        f"JOBS_PER_TASK={jobs_per_task},NUM_SIMS={num_sims}"
-    )
-
-    array_res = subprocess.run(
-        ['sbatch', '--parsable', f'--array={array_spec}',
-         f'--export={export}', 'scripts/sims.sbatch'],
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-        universal_newlines=True, cwd=project_root, check=True,
-    )
-    new_array_job = array_res.stdout.strip()
-
-    final_export = (
-        f"DESIGN={design_name},DATASET={dataset_name},"
-        f"MODEL={selected_model_name}"
-    )
-    final_res = subprocess.run(
-        ['sbatch', '--parsable',
-         f'--dependency=afterok:{new_array_job}',
-         f'--export={final_export}', 'scripts/finalize.sbatch'],
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-        universal_newlines=True, cwd=project_root, check=True,
-    )
-    new_final_job = final_res.stdout.strip()
-    return new_array_job, new_final_job
-
-
-def _wait_for_dataset(path, poll=10):
-    """Block until the dataset file exists."""
-    while not os.path.exists(path):
-        time.sleep(poll)
-
-
-def _read_dataset_rows(path):
-    with open(path, 'r') as _f:
-        return len(json.load(_f))
-
-
 # Pass the model filename as the 4th argument
 cmd = [submit_sims_path, design_name, dataset_name, str(num_samples), selected_model_name]
 
@@ -552,142 +506,54 @@ for f in os.listdir(sims_dir):
 if args.no_slurm:
     print("[NO-SLURM MODE] Simulation phase is not supported without SLURM. Please generate the dataset manually if needed.")
 else:
+    # The kernel rejects scripts with DOS line endings: a CRLF shebang becomes
+    # '#!/bin/bash\r', so it looks for interpreter 'bash\r' and fails with
+    # ENOENT (surfaced as "No such file or directory" on the script itself).
+    # Normalize to LF in-place before executing, as done for train.sbatch.
+    try:
+        with open(submit_sims_path, 'rb') as f:
+            data = f.read()
+        if b'\r\n' in data:
+            with open(submit_sims_path, 'wb') as f:
+                f.write(data.replace(b'\r\n', b'\n'))
+    except Exception as e:
+        print(f"Warning: Could not normalize line endings on {submit_sims_path}: {e}")
+
     submit_res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                 universal_newlines=True, check=True)
     sys.stdout.write(submit_res.stdout)
     run_info = _parse_submit_output(submit_res.stdout)
-    if not {'ARRAY_JOB', 'JOBS_PER_TASK', 'NUM_SIMS'}.issubset(run_info):
+    if not {'ARRAY_JOB', 'FINAL_JOB'}.issubset(run_info):  # original: if not {'ARRAY_JOB', 'JOBS_PER_TASK', 'NUM_SIMS'}.issubset(run_info):
         print("ERROR: Could not parse submit_sims.sh output for ARRAY_JOB / "
-              "JOBS_PER_TASK / NUM_SIMS. Retry-on-shortfall will be unavailable.",
+              "FINAL_JOB; cannot chain the training job. Aborting.",  # original: "NUM_SIMS. Retry-on-shortfall will be unavailable.",
               file=sys.stderr)
         sys.exit(1)
     array_job_id = run_info['ARRAY_JOB']
-    final_job_id = run_info.get('FINAL_JOB')
-    jobs_per_task = int(run_info['JOBS_PER_TASK'])
-    num_sims = int(run_info['NUM_SIMS'])
-    print(f"\nSLURM job submitted for simulation and dataset generation: {dataset_name}.json\n")
+    final_job_id = run_info['FINAL_JOB']  # original: final_job_id = run_info.get('FINAL_JOB')
+    print(f"\nSLURM jobs submitted for simulation and dataset generation: {dataset_name}.json")  # original: print(f"\nSLURM job submitted for simulation and dataset generation: {dataset_name}.json\n")
+    print(f"  Array job:    {array_job_id}")
+    print(f"  Finalize job: {final_job_id} (afterok:{array_job_id})\n")
 
-# Step 5: Wait for dataset file to exist, then sanity-check its row
-# count. If the run came up short (e.g. some array tasks crashed),
-# identify the failed tasks from logs/sim-<ARRAY_JOB>_*.err and resubmit
-# only those -- up to MAX_RETRIES times. Pin JOBS_PER_TASK and NUM_SIMS
-# so the (task->run_id) slicing stays consistent across passes.
-import json
+    # Chain training after the dataset is built. Rather than have this
+    # login-node process block/poll for the dataset, submit the training job
+    # now with an afterok dependency on the finalize job so SLURM releases it
+    # only once the simulations and dataset build have succeeded. Per-task
+    # retry and shortfall handling now live inside the simulation array
+    # itself (a task fails if it can't reach NUM_SAMPLES, which blocks
+    # finalize -- and therefore training -- via the afterok chain).
+    print("Submitting training job to run after simulations complete...")
+    train_model(dataset_path, design=design_name, dependency=final_job_id)
+    print("Simulation and training jobs are queued. Training will start automatically once the dataset is ready.\n")
+    sys.exit(0)
 
-expected_rows = num_pvt * num_skew * num_samples
-MAX_RETRIES = 2
-
-print(f"Waiting for dataset file to be created: {dataset_path}")
-_wait_for_dataset(dataset_path)
-
-for attempt in range(MAX_RETRIES + 1):
-    try:
-        actual_rows = _read_dataset_rows(dataset_path)
-    except Exception as e:
-        print(f"ERROR: Could not read dataset file {dataset_path}: {e}",
-              file=sys.stderr)
-        sys.exit(1)
-
-    if actual_rows >= expected_rows:
-        print(f"Dataset complete: {actual_rows} rows "
-              f"(expected {expected_rows}).")
-        break
-
-    shortfall = expected_rows - actual_rows
-    print(f"\nDataset is short by {shortfall} rows "
-          f"(have {actual_rows}, expected {expected_rows}).")
-
-    if attempt >= MAX_RETRIES:
-        print(f"ERROR: Exhausted {MAX_RETRIES} retries; aborting before "
-              f"training.", file=sys.stderr)
-        sys.exit(1)
-
-    failed_ids = _find_failed_task_ids(array_job_id)
-    if not failed_ids:
-        print("ERROR: Dataset is short but no failed SLURM tasks were "
-              f"found under logs/sim-{array_job_id}_*.err. Cannot "
-              "auto-recover; aborting.", file=sys.stderr)
-        sys.exit(1)
-
-    print(f"Retry {attempt + 1}/{MAX_RETRIES}: "
-          f"{len(failed_ids)} failed tasks detected for job {array_job_id}.")
-    try:
-        array_job_id, final_job_id = _resubmit_failed(failed_ids, jobs_per_task, num_sims)
-    except subprocess.CalledProcessError as e:
-        print(f"ERROR: sbatch failed during retry: {e.stderr or e.stdout}",
-              file=sys.stderr)
-        sys.exit(1)
-
-    # Delete the stale dataset so the poll loop waits for finalize to
-    # rewrite it with the combined results.
-    try:
-        os.remove(dataset_path)
-    except OSError:
-        pass
-    print(f"Waiting for dataset to be rebuilt: {dataset_path}")
-    _wait_for_dataset(dataset_path)
-
-# Step 6: Dataset is complete; remove per-task sim logs and per-run
-# SPICE artifacts so the workspace is tidy, then submit training.
-print("Cleaning up per-run artifacts...")
-for f in os.listdir(logs_dir):
-    if f.startswith('sim'):
-        fp = os.path.join(logs_dir, f)
-        try:
-            if os.path.isfile(fp):
-                os.remove(fp)
-        except Exception as e:
-            print(f"Warning: Could not delete {fp}: {e}")
-
-for f in os.listdir(sims_dir):
-    fp = os.path.join(sims_dir, f)
-    try:
-        if os.path.isfile(fp):
-            os.remove(fp)
-    except Exception as e:
-        print(f"Warning: Could not delete {fp}: {e}")
-
-# Archive the finalize job's logs under results/ keyed by process model
-# (e.g. results/finalize-22nm_LP.out). Empty .err files are deleted
-# rather than archived. Falls back to scanning logs/ if FINAL_JOB was
-# not captured (older submit_sims.sh output).
-import shutil as _shutil
-_final_src_out = None
-_final_src_err = None
-if final_job_id:
-    _final_src_out = os.path.join(logs_dir, f"finalize-{final_job_id}.out")
-    _final_src_err = os.path.join(logs_dir, f"finalize-{final_job_id}.err")
-else:
-    _finalize_outs = sorted(glob.glob(os.path.join(logs_dir, "finalize-*.out")),
-                            key=os.path.getmtime)
-    if _finalize_outs:
-        _final_src_out = _finalize_outs[-1]
-        _final_src_err = _final_src_out[:-4] + ".err"
-
-if _final_src_out and os.path.isfile(_final_src_out):
-    dst_out = os.path.join(results_dir, f"finalize-{process_name}.out")
-    try:
-        _shutil.copy2(_final_src_out, dst_out)
-        print(f"Archived finalize stdout -> {dst_out}")
-    except Exception as e:
-        print(f"Warning: Could not copy {_final_src_out} -> {dst_out}: {e}")
-
-dst_err = os.path.join(results_dir, f"finalize-{process_name}.err")
-if _final_src_err and os.path.isfile(_final_src_err):
-    if os.path.getsize(_final_src_err) == 0:
-        # Empty stderr: don't archive; also remove any stale file from a
-        # previous run of this same process model.
-        if os.path.exists(dst_err):
-            try:
-                os.remove(dst_err)
-            except Exception as e:
-                print(f"Warning: Could not remove stale {dst_err}: {e}")
-    else:
-        try:
-            _shutil.copy2(_final_src_err, dst_err)
-            print(f"Archived finalize stderr -> {dst_err}")
-        except Exception as e:
-            print(f"Warning: Could not copy {_final_src_err} -> {dst_err}: {e}")
+# Reaching here means --no-slurm: the SLURM branch above submits the
+# simulation + dependent training jobs and exits. Without SLURM the
+# simulation phase is unsupported, so train locally on an existing dataset.
+if not os.path.exists(dataset_path):
+    print(f"ERROR: [NO-SLURM MODE] Dataset not found: {dataset_path}. "
+          "Generate it manually before running with --no-slurm.",
+          file=sys.stderr)
+    sys.exit(1)
 
 print("Ready! Proceeding to training phase...")
 train_model(dataset_path, design=design_name)

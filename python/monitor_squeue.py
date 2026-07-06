@@ -8,7 +8,7 @@ from datetime import datetime
 
 USER = "jonesm25"
 EMAIL = "jonesm25@oregonstate.edu"
-CHECK_INTERVAL = 900  # 15 minutes in seconds
+CHECK_INTERVAL = 3600  # 1 hour in seconds
 LOGS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'logs'))
 
 

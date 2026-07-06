@@ -358,7 +358,10 @@ def create_dataset():
                 df[col] = df[col].apply(lambda x: json.dumps(x) if isinstance(x, dict) else x)
 
         nunique = df.nunique(dropna=False)
-        always_keep = {'Design'}
+        # PVT and Skew are required by the downstream dataset loader
+        # (dataset.py drops/encodes them), so never treat them as constant
+        # columns even when a dataset happens to cover a single corner combo.
+        always_keep = {'Design', 'PVT', 'Skew'}  # original: always_keep = {'Design'}
 
         if dataset:
 
@@ -385,6 +388,13 @@ def create_dataset():
 
         dataset = df.to_dict(orient='records')
 
+    # Sort rows by ID so the saved .json reads in ascending ID order. The
+    # per-task metadata files are merged in string-sorted glob order
+    # (task_0, task_1, task_10, ..., task_9), so without this the rows would
+    # not be in numeric ID order.
+    if dataset and 'ID' in dataset[0]:
+        dataset.sort(key=lambda row: row['ID'])
+
     return dataset, len(metadata), process_tag
 
 def save_dataset(dataset, metadata_count, output_file='dataset.json'):
@@ -393,34 +403,12 @@ def save_dataset(dataset, metadata_count, output_file='dataset.json'):
         json.dump(dataset, f, indent=2)
 
     if not dataset:
-        print("\nNo successful simulation results found. Dataset is empty. Skipping CSV and summary statistics.")
+        print("\nNo successful simulation results found. Dataset is empty. Skipping summary statistics.")  # original: ... Skipping CSV and summary statistics.
 
         return
 
-    df = pd.DataFrame(dataset)
-
-    if 'Design' not in df.columns:
-
-        design_val = None
-
-        if len(dataset) > 0 and 'Design' in dataset[0]:
-            design_val = dataset[0]['Design']
-
-        if not design_val:
-            design_val = os.environ.get('SPICE_DESIGN_NAME', '2inv')
-
-        df.insert(1, 'Design', design_val)
-
-    else:
-
-        cols = list(df.columns)
-        cols.remove('Design')
-        cols.insert(1, 'Design')
-        df = df[cols]
-
-    csv_file = output_file.replace('.json', '.csv')
-    df.to_csv(csv_file, index=False)
-    successful_runs = len(dataset)
+    successful_runs = len(dataset)  # original: (a df was built here and written to CSV)
+    unique_ids = len({row.get('ID') for row in dataset if 'ID' in row})
     print(f"\n--- Dataset Summary ---\n")
     new_sim_count = os.environ.get('NEW_SIM_COUNT')
 
@@ -430,6 +418,7 @@ def save_dataset(dataset, metadata_count, output_file='dataset.json'):
     print(f"Total simulations: {metadata_count}")
     print(f"Successful: {successful_runs}")
     print(f"Failed: {metadata_count - successful_runs}")
+    print(f"Rows written to dataset: {successful_runs} ({unique_ids} unique IDs)")
 
     if successful_runs > 0:
 
@@ -443,12 +432,12 @@ def save_dataset(dataset, metadata_count, output_file='dataset.json'):
             print(f"Mean: {target_currents.mean():.2e} A")
             print(f"Std: {target_currents.std():.2e} A")
 
-    print(f"\nDataset saved to: {output_file} and {csv_file}")
+    print(f"\nDataset saved to: {output_file}")  # original: print(f"\nDataset saved to: {output_file} and {csv_file}")
 
 if __name__ == "__main__":
     
     RESULTS_DIR = "results"
-    DATASET_DIR = "dataset"
+    DATASET_DIR = "datasets"  # original: DATASET_DIR = "dataset"
     meta_path = os.path.join(RESULTS_DIR, 'metadata.json')
 
     if not os.path.exists(meta_path):

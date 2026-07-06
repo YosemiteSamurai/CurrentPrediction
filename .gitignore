@@ -28,25 +28,22 @@ Thumbs.db
 # Google Drive
 .tmp.driveupload/
 
+# Only want PDFs
+reports/*
+!reports/*.pdf
+
 # Local-only directories
 misc/
 matrices/
+
+
+# Large datasets and results (regenerated locally; not for GitHub)
+datasets/
 results/
-
-# Large datasets (regenerated locally; not for GitHub)
-dataset/
-
-# Stale code / script backups
-python/backup/
-python/backup2/
-python/backup3/
-scripts/backup2/
-scripts/backup3/
 
 # Generated logs
 logs/
 *.log
 
-# Privacy attack artifacts (keep scripts, ignore large outputs)
-privacy/*.npz
-privacy/*.csv
+# Attack artifacts (keep scripts in attacks/, ignore generated inputs)
+attacks/inputs/

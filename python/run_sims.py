@@ -16,6 +16,7 @@
 
 import subprocess
 import os
+import sys
 import random
 import json
 import time
@@ -42,7 +43,7 @@ except ModuleNotFoundError:
 
 parser = argparse.ArgumentParser(description="Run SPICE simulations and generate dataset.")
 parser.add_argument('--design', type=str, required=True, help='Design netlist name (without .sp)')
-parser.add_argument('--dataset', type=str, default='dataset2', help='Dataset base name (writes <name>.json and <name>.csv)')
+parser.add_argument('--dataset', type=str, default='dataset2', help='Dataset base name (writes <name>.json)')  # original: help='Dataset base name (writes <name>.json and <name>.csv)'
 
 parser.add_argument(
 
@@ -59,23 +60,39 @@ parser.add_argument('--task-id', type=int, default=None,
     help='SLURM array task ID for parallel execution (0-based index into model×pvt×skew combos)')
 parser.add_argument('--count-tasks', action='store_true',
     help='Print total number of array tasks needed and exit (used by submit_sims.sh)')
+parser.add_argument('--count-sims', action='store_true',
+    help='Print total number of simulations (combos x NUM_SAMPLES) and exit (used by submit_sims.sh)')
 parser.add_argument('--finalize', action='store_true',
     help='Merge per-task metadata and build dataset (run after array job completes)')
+parser.add_argument('--model', default=None,
+    help='Restrict simulation to a single process model (e.g. 22nm_LP or 22nm_LP.pm); each dataset covers one model')
 args = parser.parse_args()
 dataset_name = os.path.splitext(args.dataset)[0]
-os.system('cls' if os.name == 'nt' else 'clear')
+# Only clear the screen for interactive runs. In SLURM batch jobs (--finalize,
+# array tasks) and when stdout is captured (--count-tasks) there is no TTY/TERM,
+# so `clear` would emit escape codes or print "TERM environment variable not set."
+if sys.stdout.isatty():  # original: (unconditional)
+    os.system('cls' if os.name == 'nt' else 'clear')
 
 NGSPICE = "ngspice"
 BASE_SPICE = os.path.join("designs", "template.sp")
 MODELS_DIR = "models"
 CORNERS_DIR = "corners"
 OUT_DIR = "results"
+SIMS_DIR = "sims"  # per-run SPICE logs (run_<design>_<id>.log) live here
 MATRICES_DIR = "matrices"
-DATASET_DIR = "dataset"
+DATASET_DIR = "datasets"  # original: DATASET_DIR = "dataset"
 SCRIPTS_DIR = "scripts"
-NUM_SAMPLES = 7
+NUM_SAMPLES = int(os.environ.get("NUM_SAMPLES", 7))  # original: NUM_SAMPLES = 7
+# Max simulations per SLURM array task. The total work (combos x NUM_SAMPLES)
+# is split into contiguous chunks of this size so every array task finishes
+# within the sims.sbatch wall-clock limit (~1 sim/sec -> 1200 sims ~= 20 min,
+# comfortably inside 30 min). More samples just means more tasks, not longer
+# ones. Override via the SIMS_PER_TASK env var if node speed differs.
+SIMS_PER_TASK = int(os.environ.get("SIMS_PER_TASK", 1200))
 
 os.makedirs(OUT_DIR, exist_ok=True)
+os.makedirs(SIMS_DIR, exist_ok=True)  # per-run SPICE logs
 os.makedirs(MATRICES_DIR, exist_ok=True)
 os.makedirs(DATASET_DIR, exist_ok=True)
 
@@ -90,20 +107,40 @@ if args.task_id is None:
             if os.path.isfile(file_path):
                 os.remove(file_path)
 
+        # Per-run SPICE logs now live in sims/, so clear them there too.
+        if os.path.isdir(SIMS_DIR):
+            for file in os.listdir(SIMS_DIR):
+                file_path = os.path.join(SIMS_DIR, file)
+
+                if os.path.isfile(file_path):
+                    os.remove(file_path)
+
     elif args.clean == 'design':
 
         print(f"Cleaning results for design '{args.design}'...")
         design_log_pattern = re.compile(rf"run_{re.escape(args.design)}_(\d+)\.log$")
         design_metadata = f"metadata_{args.design}.json"
 
+        # Remove this design's metadata from results/.
         for file in os.listdir(OUT_DIR):
             file_path = os.path.join(OUT_DIR, file)
 
             if not os.path.isfile(file_path):
                 continue
 
-            if design_log_pattern.fullmatch(file) or file == design_metadata:
+            if file == design_metadata:
                 os.remove(file_path)
+
+        # Remove this design's per-run SPICE logs from sims/.
+        if os.path.isdir(SIMS_DIR):
+            for file in os.listdir(SIMS_DIR):
+                file_path = os.path.join(SIMS_DIR, file)
+
+                if not os.path.isfile(file_path):
+                    continue
+
+                if design_log_pattern.fullmatch(file):
+                    os.remove(file_path)
 
 DESIGN_NETLIST = os.path.join("designs", args.design + '.sp')
 
@@ -119,7 +156,10 @@ with open(BASE_SPICE) as f:
     else:
         netlist_name = os.path.basename(DESIGN_NETLIST)
 
-print(f"Simulating {netlist_name} to create a dataset...\n")
+# Suppress this banner in --count-tasks/--count-sims mode so the captured
+# stdout is just the integer that submit_sims.sh reads.
+if not (args.count_tasks or args.count_sims):  # original: if not args.count_tasks:
+    print(f"Simulating {netlist_name} to create a dataset...\n")
 
 PROCESS_PARAM_RANGES = {
 
@@ -256,6 +296,12 @@ def write_netlist(params, model, pvt_corner, skew_corner, run_id, design_netlist
     return fname
 
 def run_ngspice(netlist, out_file):
+    """Run one ngspice simulation.
+
+    Returns True on success, False on a transient failure (non-zero exit or
+    unparseable output) so the caller can retry with fresh params. A missing
+    ngspice binary is fatal and is allowed to propagate.
+    """
 
     cmd = [
         NGSPICE,
@@ -264,16 +310,26 @@ def run_ngspice(netlist, out_file):
         netlist
     ]
 
-    result = subprocess.run(cmd, check=True, 
-                          stdout=subprocess.DEVNULL, 
-                          stderr=subprocess.DEVNULL)
+    try:
+        subprocess.run(cmd, check=True,
+                       stdout=subprocess.DEVNULL,
+                       stderr=subprocess.DEVNULL)
+    except subprocess.CalledProcessError as e:  # original: result = subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        print(f"Warning: ngspice exited {e.returncode} for {netlist}; retrying with new params")
+        return False
 
     if not args.debug:
 
-        results = parse_spice_log(out_file)
+        try:
+            results = parse_spice_log(out_file)
+        except Exception as e:
+            print(f"Warning: could not parse ngspice output {out_file}: {e}; retrying")
+            return False
 
         with open(out_file, 'w') as f:
             json.dump(results, f)
+
+    return True
 
 def regenerate_matrices():
 
@@ -282,6 +338,15 @@ def regenerate_matrices():
         for f in sorted(os.listdir(MODELS_DIR))
         if f.endswith('.pm') and os.path.isfile(os.path.join(MODELS_DIR, f))
     ]
+
+    # Each dataset covers a single process model. Restrict to the selected one
+    # so NUM_TASKS = pvt × skew matches the pipeline's expected_rows.
+    if args.model:
+        target = args.model if args.model.endswith('.pm') else args.model + '.pm'
+        models = [m for m in models if os.path.basename(m) == target]
+        if not models:
+            print(f"Error: model '{args.model}' not found in {MODELS_DIR}/")
+            exit(1)
 
     pvt_corners = [
         os.path.join(CORNERS_DIR, f)
@@ -295,25 +360,50 @@ def regenerate_matrices():
         if f.startswith("skew_") and f.endswith(".sp")
     ]
 
-    if args.count_tasks:
+    all_combos = [(m, p, s) for m in sorted(models) for p in sorted(pvt_corners) for s in sorted(skew_corners)]
+    total_simulations_all = len(all_combos) * NUM_SAMPLES
 
-        print(len(models) * len(pvt_corners) * len(skew_corners))
+    if args.count_sims:
+
+        # Total sims across all combos; submit_sims.sh uses this to size the
+        # array (and to auto-bump SIMS_PER_TASK if it would exceed MaxArraySize).
+        print(total_simulations_all)
         exit(0)
 
-    if args.task_id is not None:
+    if args.count_tasks:
 
-        all_combos = [(m, p, s) for m in sorted(models) for p in sorted(pvt_corners) for s in sorted(skew_corners)]
+        # Number of array tasks needed to cover every simulation in bounded
+        # SIMS_PER_TASK-sized chunks (ceil division).
+        num_tasks = (total_simulations_all + SIMS_PER_TASK - 1) // SIMS_PER_TASK
+        print(max(num_tasks, 1))
+        exit(0)
 
-        if args.task_id >= len(all_combos):
+    # Determine which slice of the flattened (combo x NUM_SAMPLES) work list
+    # this invocation runs. In array mode each --task-id owns a contiguous
+    # SIMS_PER_TASK-sized slice so it finishes in bounded wall-clock time; a
+    # full local run (no --task-id) runs everything.
+    if args.task_id is not None:  # original: single combo per task (all_combos[task_id])
+        chunk_start = args.task_id * SIMS_PER_TASK
+        chunk_end = min(chunk_start + SIMS_PER_TASK, total_simulations_all)
+        if chunk_start >= total_simulations_all:
+            print(f"Task {args.task_id}: nothing to do "
+                  f"(start {chunk_start} >= total {total_simulations_all}); exiting.")
+            exit(0)
+    else:
+        chunk_start = 0
+        chunk_end = total_simulations_all
 
-            print(f"Error: --task-id {args.task_id} out of range (0-{len(all_combos)-1})")
-
-            exit(1)
-
-        _m, _p, _s = all_combos[args.task_id]
-        models       = [_m]
-        pvt_corners  = [_p]
-        skew_corners = [_s]
+    # Map the [chunk_start, chunk_end) global range onto (combo, lo, hi)
+    # segments, where global run ids lo..hi-1 belong to that combo. run_id is
+    # the global index so output filenames never collide across tasks.
+    task_work = []
+    for _ci, _combo in enumerate(all_combos):
+        _c_lo = _ci * NUM_SAMPLES
+        _c_hi = _c_lo + NUM_SAMPLES
+        _lo = max(chunk_start, _c_lo)
+        _hi = min(chunk_end, _c_hi)
+        if _lo < _hi:
+            task_work.append((_combo, _lo, _hi))
 
     if args.finalize:
 
@@ -362,30 +452,15 @@ def regenerate_matrices():
                 os.remove(tf)
 
         print("Parsing results and creating dataset...")
-        dataset, total_sims = create_dataset()
+        dataset, total_sims, _process_tag = create_dataset()  # original: dataset, total_sims = create_dataset()
         save_dataset(dataset, total_sims, os.path.join(DATASET_DIR, f'{dataset_name}.json'))
         print()
         exit(0)
 
-    if args.task_id is not None:
-        run_id = args.task_id * NUM_SAMPLES
-
-    elif args.clean:
-        run_id = 0
-
-    else:
-
-        log_pattern = rf"run_{args.design}_(\\d+)\\.log"
-        existing_logs = [f for f in os.listdir(OUT_DIR) if re.fullmatch(log_pattern, f)]
-
-        if existing_logs:
-            max_id = max(int(re.fullmatch(log_pattern, f).group(1)) for f in existing_logs)
-            run_id = max_id + 1
-
-        else:
-            run_id = 0
-
-    total_simulations = len(models) * len(pvt_corners) * len(skew_corners) * NUM_SAMPLES
+    # This invocation runs exactly the sims in task_work: a bounded chunk in
+    # array mode, or everything in a full local run. run_id is the global sim
+    # index, so per-run output filenames never collide across array tasks.
+    total_simulations = chunk_end - chunk_start  # original: len(models)*len(pvt_corners)*len(skew_corners)*NUM_SAMPLES
     print(f"Starting {total_simulations} simulations...")
 
     if total_simulations > 500:
@@ -393,35 +468,13 @@ def regenerate_matrices():
 
     meta_data = []
 
-    existing_params_set = set()
-
-    if not args.clean:
-        metadata_path = os.path.join(OUT_DIR, f"metadata_{args.design}.json")
-
-        if os.path.exists(metadata_path):
-
-            with open(metadata_path, "r") as f:
-
-                try:
-
-                    prev_meta = json.load(f)
-                    for entry in prev_meta:
-
-                        param_tuple = tuple(sorted(entry["params"].items()))
-                        existing_params_set.add(param_tuple)
-
-                except Exception:
-                    pass
-
     start_time = time.time()
 
     session_run_idx = 0
 
-    for model in models:
+    for (model, pvt_corner, skew_corner), _g_lo, _g_hi in task_work:  # original: for model in models: for pvt_corner...: for skew_corner...:
 
-        for pvt_corner in pvt_corners:
-
-            for skew_corner in skew_corners:
+                n_sims = _g_hi - _g_lo
 
                 model_name = os.path.basename(model)
 
@@ -432,29 +485,50 @@ def regenerate_matrices():
 
                 ranges = PROCESS_PARAM_RANGES[model_name]
                 new_unique_params = set()
-                max_attempts = NUM_SAMPLES * 100  # Avoid infinite loop
+                max_attempts = n_sims * 100  # Avoid infinite loop  # original: NUM_SAMPLES * 100
                 attempts = 0
+                produced = 0  # successful, recorded sims for this combo segment
 
-                while len(new_unique_params) < NUM_SAMPLES and attempts < max_attempts:
+                while produced < n_sims and attempts < max_attempts:  # original: while len(new_unique_params) < NUM_SAMPLES and attempts < max_attempts:
 
                     params = {k: np.random.uniform(lo, hi) for k, (lo, hi) in ranges.items()}
                     param_tuple = tuple(sorted(params.items()))
                     attempts += 1
 
-                    if param_tuple in existing_params_set or param_tuple in new_unique_params:
+                    if param_tuple in new_unique_params:  # original: if param_tuple in existing_params_set or param_tuple in new_unique_params:
                         continue
 
-                    new_unique_params.add(param_tuple)
-                    existing_params_set.add(param_tuple)
+                    run_id = _g_lo + produced  # global sim index  # original: (run_id incremented per sim)
 
                     netlist = write_netlist(
                         params, model, pvt_corner, skew_corner, run_id, DESIGN_NETLIST
                     )
 
                     out_file = os.path.join(
-                        OUT_DIR,
+                        SIMS_DIR,  # original: OUT_DIR
                         f"run_{args.design}_{run_id}.log"
                     )
+
+                    # Run the simulation first; only count and record it once
+                    # it has succeeded. A transient ngspice/parse failure is
+                    # discarded (with its netlist/log) and retried with fresh
+                    # params, so each combo segment still reaches n_sims.
+                    sim_ok = run_ngspice(netlist, out_file)
+
+                    try:
+                        os.remove(netlist)
+                    except Exception as e:
+                        print(f"Warning: Could not delete netlist {netlist}: {e}")
+
+                    if not sim_ok:
+                        try:
+                            if os.path.exists(out_file):
+                                os.remove(out_file)
+                        except Exception:
+                            pass
+                        continue
+
+                    new_unique_params.add(param_tuple)
 
                     model_basename = os.path.basename(model).replace('.pm', '')
                     pvt_name = os.path.basename(pvt_corner).replace('.sp', '')
@@ -481,8 +555,6 @@ def regenerate_matrices():
                             f"W2N={params.get('WN2', float('nan')):.2e}"
                         )
 
-                    run_ngspice(netlist, out_file)
-
                     meta_data.append({
                         "run": run_id,
                         "design": args.design,
@@ -493,19 +565,21 @@ def regenerate_matrices():
                         "output": out_file
                     })
 
-                    try:
-                        os.remove(netlist)
-                    except Exception as e:
-                        print(f"Warning: Could not delete netlist {netlist}: {e}")
+                    produced += 1
 
-                    run_id += 1
-
-                if len(new_unique_params) < NUM_SAMPLES:
-                    print(
-                        f"Warning: Only {len(new_unique_params)} unique parameter sets "
-                        f"generated for {model_name}, {pvt_corner}, {skew_corner} "
+                if produced < n_sims:
+                    msg = (
+                        f"Only {produced}/{n_sims} successful unique "
+                        f"simulations for {model_name}, {pvt_corner}, {skew_corner} "
                         f"after {attempts} attempts."
                     )
+                    if args.task_id is not None:
+                        # Fail the array task so the afterok dependency keeps
+                        # finalize (and training) from running until this
+                        # chunk is complete.
+                        print(f"ERROR: {msg}")
+                        exit(1)
+                    print(f"Warning: {msg}")
 
     end_time = time.time()
     elapsed = end_time - start_time
@@ -544,13 +618,16 @@ def regenerate_matrices():
         print()
 
     if args.task_id is None:
-        num_existing = len(existing_params_set) if not args.clean else 0
+        num_existing = 0  # original: len(existing_params_set) if not args.clean else 0
         num_new = len(meta_data)
         import os as _os_env
         _os_env.environ['NEW_SIM_COUNT'] = str(num_new)
         _os_env.environ['TOTAL_SIM_COUNT'] = str(num_existing + num_new)
         print("Parsing results and creating dataset...")
-        dataset, total_sims = create_dataset()
+        dataset, total_sims, _process_tag = create_dataset()  # original: dataset, total_sims = create_dataset()
         save_dataset(dataset, total_sims, os.path.join(DATASET_DIR, f'{dataset_name}.json'))
         print()
         print()
+
+
+regenerate_matrices()
